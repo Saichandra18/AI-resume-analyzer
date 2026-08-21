@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>AI Resume Analyzer</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='css/style.css') }}"
+    >
+</head>
+
+<body>
+
+    <main class="container">
+
+        <section class="hero">
+            <h1>AI Resume Analyzer</h1>
+
+            <p>
+                Analyze your resume against a job description
+                and understand your ATS score.
+            </p>
+        </section>
+
+        <section class="analysis-card">
+
+            <div class="form-group">
+                <label for="resume">
+                    Upload Resume
+                </label>
+
+                <input
+                    type="file"
+                    id="resume"
+                    name="resume"
+                    accept=".pdf,.docx"
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="job-description">
+                    Job Description
+                </label>
+
+                <textarea
+                    id="job-description"
+                    name="job_description"
+                    rows="10"
+                    placeholder="Paste job description..."
+                ></textarea>
+            </div>
+
+            <button
+                type="button"
+                id="analyze-button"
+            >
+                Analyze Resume
+            </button>
+
+        </section>
+
+
+        <!-- ATS RESULTS -->
+
+        <section
+            id="results"
+            class="results"
+        >
+
+            <div class="score-card">
+
+                <h2>ATS Score</h2>
+
+                <div
+                    id="ats-score"
+                    class="ats-score"
+                >
+                    <span id="ats-score-value">
+                        --
+                    </span>
+
+                    <span class="score-total">
+                        / 100
+                    </span>
+                </div>
+
+            </div>
+
+
+            <!-- COMPONENT SCORES -->
+
+            <div
+                id="component-scores"
+                class="component-scores"
+            >
+
+                <div class="score-item">
+                    <h3>Skills</h3>
+
+                    <p id="skills-score">
+                        --
+                    </p>
+                </div>
+
+                <div class="score-item">
+                    <h3>Experience</h3>
+
+                    <p id="experience-score">
+                        --
+                    </p>
+                </div>
+
+                <div class="score-item">
+                    <h3>Qualifications</h3>
+
+                    <p id="qualifications-score">
+                        --
+                    </p>
+                </div>
+
+                <div class="score-item">
+                    <h3>Keywords</h3>
+
+                    <p id="keywords-score">
+                        --
+                    </p>
+                </div>
+
+            </div>
+
+            <!-- MATCH ANALYSIS -->
+
+            <div class="match-analysis">
+
+                <div class="match-card">
+
+                    <h2>Skills</h2>
+
+                    <div class="match-group">
+                        <h3>Matched Skills</h3>
+
+                        <ul id="matched-skills">
+                        </ul>
+                    </div>
+
+                    <div class="match-group">
+                        <h3>Missing Skills</h3>
+
+                        <ul id="missing-skills">
+                        </ul>
+                    </div>
+
+                </div>
+
+
+                <div class="match-card">
+
+                    <h2>Qualifications</h2>
+
+                    <div class="match-group">
+                        <h3>Matched Qualifications</h3>
+
+                        <ul id="matched-qualifications">
+                        </ul>
+                    </div>
+
+                    <div class="match-group">
+                        <h3>Missing Qualifications</h3>
+
+                        <ul id="missing-qualifications">
+                        </ul>
+                    </div>
+
+                </div>
+
+
+                <div class="match-card">
+
+                    <h2>Keywords</h2>
+
+                    <div class="match-group">
+                        <h3>Matched Keywords</h3>
+
+                        <ul id="matched-keywords">
+                        </ul>
+                    </div>
+
+                    <div class="match-group">
+                        <h3>Missing Keywords</h3>
+
+                        <ul id="missing-keywords">
+                        </ul>
+                    </div>
+
+                </div>
+
+            </div>
+            <!-- INSIGHTS -->
+
+            <div class="insights">
+
+                <div class="insight-card">
+
+                    <h2>Strengths</h2>
+
+                    <ul id="strengths-list">
+                    </ul>
+
+                </div>
+
+
+                <div class="insight-card">
+
+                    <h2>Areas to Improve</h2>
+
+                    <ul id="weaknesses-list">
+                    </ul>
+
+                </div>
+
+
+                <div class="insight-card">
+
+                    <h2>Recommendations</h2>
+
+                    <ul id="recommendations-list">
+                    </ul>
+
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+
+    <script
+        src="{{ url_for('static', filename='js/app.js') }}"
+    ></script>
+
+</body>
+</html>

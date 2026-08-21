@@ -1,0 +1,5 @@
+Flask
+python-dotenv
+pytest
+PyPDF2
+python-docx

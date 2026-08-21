@@ -1,0 +1,562 @@
+const resumeInput = document.getElementById("resume");
+const jobDescriptionInput = document.getElementById(
+    "job-description"
+);
+const analyzeButton = document.getElementById(
+    "analyze-button"
+);
+const resultsSection = document.getElementById("results");
+
+
+function displayScoreResults(data) {
+    const atsScoreValue = document.getElementById(
+        "ats-score-value"
+    );
+
+    const skillsScore = document.getElementById(
+        "skills-score"
+    );
+
+    const experienceScore = document.getElementById(
+        "experience-score"
+    );
+
+    const qualificationsScore = document.getElementById(
+        "qualifications-score"
+    );
+
+    const keywordsScore = document.getElementById(
+        "keywords-score"
+    );
+
+    const componentScores = data.component_scores || {};
+
+    atsScoreValue.textContent = data.ats_score ?? 0;
+
+    skillsScore.textContent =
+        componentScores.skills != null
+            ? `${Math.round(componentScores.skills)} / 100`
+            : "N/A";
+
+    experienceScore.textContent =
+        componentScores.experience != null
+            ? `${Math.round(componentScores.experience)} / 100`
+            : "N/A";
+
+    qualificationsScore.textContent =
+        componentScores.qualifications != null
+            ? `${Math.round(componentScores.qualifications)} / 100`
+            : "N/A";
+
+    keywordsScore.textContent =
+        componentScores.keywords != null
+            ? `${Math.round(componentScores.keywords)} / 100`
+            : "N/A";
+
+    resultsSection.style.display = "block";
+}
+
+function displayMatchResults(data) {
+    const matchSections = [
+        {
+            elementId: "matched-skills",
+            values: data.matched_skills,
+            emptyMessage: "No matched skills."
+        },
+        {
+            elementId: "missing-skills",
+            values: data.missing_skills,
+            emptyMessage: "No missing skills."
+        },
+        {
+            elementId: "matched-qualifications",
+            values: data.matched_qualifications,
+            emptyMessage: "No matched qualifications."
+        },
+        {
+            elementId: "missing-qualifications",
+            values: data.missing_qualifications,
+            emptyMessage: "No missing qualifications."
+        },
+        {
+            elementId: "matched-keywords",
+            values: groupMatchedKeywords(
+                Array.isArray(data.matched_keywords)
+                    ? data.matched_keywords
+                    : []
+            ),
+            emptyMessage: "No matched keywords."
+        },
+        {
+            elementId: "missing-keywords",
+            values: data.missing_keywords,
+            emptyMessage: "No missing keywords."
+        }
+    ];
+
+    matchSections.forEach((section) => {
+        const element = document.getElementById(
+            section.elementId
+        );
+
+        element.innerHTML = "";
+
+        const values = Array.isArray(section.values)
+            ? section.values
+            : [];
+
+        if (values.length === 0) {
+            const item = document.createElement("li");
+
+            item.textContent = section.emptyMessage;
+
+            element.appendChild(item);
+
+            return;
+        }
+
+        values.forEach((value) => {
+            const item = document.createElement("li");
+
+            item.textContent = value;
+
+            element.appendChild(item);
+        });
+    });
+}
+
+function groupMatchedKeywords(keywords) {
+    const groups = [
+        {
+            label: "Artificial Intelligence (AI)",
+            terms: [
+                "artificial intelligence",
+                "ai"
+            ]
+        },
+        {
+            label: "Machine Learning (ML)",
+            terms: [
+                "machine learning",
+                "ml"
+            ]
+        },
+        {
+            label: "Generative AI (GenAI)",
+            terms: [
+                "generative ai",
+                "genai"
+            ]
+        },
+        {
+            label: "Large Language Models (LLM)",
+            terms: [
+                "large language model",
+                "large language models",
+                "llm",
+                "llms"
+            ]
+        },
+        {
+            label: "Retrieval Augmented Generation (RAG)",
+            terms: [
+                "retrieval augmented generation",
+                "rag"
+            ]
+        },
+        {
+            label: "Neural Networks",
+            terms: [
+                "neural network",
+                "neural networks"
+            ]
+        },
+        {
+            label: "CI/CD",
+            terms: [
+                "ci cd",
+                "ci",
+                "cd"
+            ]
+        }
+    ];
+
+    const normalizedKeywords = new Set(
+        keywords.map((keyword) =>
+            keyword.trim().toLowerCase()
+        )
+    );
+
+    const grouped = [];
+
+    groups.forEach((group) => {
+        const matched = group.terms.some((term) =>
+            normalizedKeywords.has(term)
+        );
+
+        if (matched) {
+            grouped.push(group.label);
+        }
+    });
+
+    const groupedTerms = new Set(
+        groups.flatMap((group) => group.terms)
+    );
+
+    keywords.forEach((keyword) => {
+        const normalized = keyword.trim().toLowerCase();
+
+        if (!groupedTerms.has(normalized)) {
+            grouped.push(keyword);
+        }
+    });
+
+    return grouped;
+}
+
+function groupInsightValues(values, sectionType) {
+    if (!Array.isArray(values) || values.length === 0) {
+        return [];
+    }
+
+    const groups = [
+        {
+            label: "MLOps & Production",
+            terms: [
+                "machine learning operations",
+                "mlops",
+                "llmops",
+                "model deployment",
+                "model monitoring"
+            ],
+            canonical: {
+                "machine learning operations":
+                    "Machine Learning Operations",
+                "mlops": "MLOps",
+                "llmops": "LLMOps",
+                "model deployment": "Model Deployment",
+                "model monitoring": "Model Monitoring"
+            }
+        },
+        {
+            label: "Model Evaluation",
+            terms: [
+                "model validation",
+                "model evaluation",
+                "model testing"
+            ],
+            canonical: {
+                "model validation": "Model Validation",
+                "model evaluation": "Model Evaluation",
+                "model testing": "Model Testing"
+            }
+        },
+        {
+            label: "AI/ML Foundation",
+            terms: [
+                "artificial intelligence",
+                "ai",
+                "machine learning",
+                "ml",
+                "generative ai",
+                "genai",
+                "large language models",
+                "large language model",
+                "llms",
+                "llm",
+                "retrieval augmented generation",
+                "rag",
+                "neural networks",
+                "neural network",
+                "deep learning"
+            ],
+            canonical: {
+                "artificial intelligence":
+                    "Artificial Intelligence (AI)",
+                "ai":
+                    "Artificial Intelligence (AI)",
+                "machine learning":
+                    "Machine Learning (ML)",
+                "ml":
+                    "Machine Learning (ML)",
+                "generative ai":
+                    "Generative AI (GenAI)",
+                "genai":
+                    "Generative AI (GenAI)",
+                "large language models":
+                    "Large Language Models (LLM)",
+                "large language model":
+                    "Large Language Models (LLM)",
+                "llms":
+                    "Large Language Models (LLM)",
+                "llm":
+                    "Large Language Models (LLM)",
+                "retrieval augmented generation":
+                    "Retrieval Augmented Generation (RAG)",
+                "rag":
+                    "Retrieval Augmented Generation (RAG)",
+                "neural networks":
+                    "Neural Networks",
+                "neural network":
+                    "Neural Networks",
+                "deep learning":
+                    "Deep Learning"
+            }
+        },
+        {
+            label: "Engineering & Development",
+            terms: [
+                "python",
+                "java",
+                "javascript",
+                "typescript",
+                "c++",
+                "ci/cd",
+                "ci cd",
+                "ci",
+                "cd",
+                "software development"
+            ],
+            canonical: {
+                "python": "Python",
+                "java": "Java",
+                "javascript": "JavaScript",
+                "typescript": "TypeScript",
+                "c++": "C++",
+                "ci/cd": "CI/CD",
+                "ci cd": "CI/CD",
+                "ci": "CI/CD",
+                "cd": "CI/CD",
+                "software development":
+                    "Software Development"
+            }
+        }
+    ];
+
+    const normalize = (text) =>
+        text
+            .toString()
+            .trim()
+            .toLowerCase()
+            .replace(/[()]/g, "")
+            .replace(/\s+/g, " ");
+
+    const getItemText = (value) =>
+        normalize(
+            value?.item ||
+            value?.description ||
+            value?.recommendation ||
+            value ||
+            ""
+        );
+
+    const grouped = [];
+    const usedIndexes = new Set();
+
+    groups.forEach((group) => {
+        const canonicalItems = [];
+        const seenCanonical = new Set();
+
+        values.forEach((value, index) => {
+            if (usedIndexes.has(index)) {
+                return;
+            }
+
+            const text = getItemText(value);
+
+            const matchedTerm = group.terms.find((term) =>
+                text.includes(normalize(term))
+            );
+
+            if (!matchedTerm) {
+                return;
+            }
+
+            usedIndexes.add(index);
+
+            const canonicalItem =
+                group.canonical[matchedTerm] || matchedTerm;
+
+            const normalizedCanonical =
+                normalize(canonicalItem);
+
+            if (!seenCanonical.has(normalizedCanonical)) {
+                seenCanonical.add(normalizedCanonical);
+                canonicalItems.push(canonicalItem);
+            }
+        });
+
+        if (canonicalItems.length === 0) {
+            return;
+        }
+
+        let description;
+
+        if (sectionType === "strengths") {
+            description =
+                `Strong coverage across ` +
+                `${canonicalItems.join(", ")}.`;
+        } else if (sectionType === "weaknesses") {
+            description =
+                `Consider strengthening ` +
+                `${group.label} with ` +
+                `${canonicalItems.join(", ")} ` +
+                `where applicable.`;
+        } else {
+            description =
+                `Highlight relevant ` +
+                `${group.label.toLowerCase()} experience, ` +
+                `including ${canonicalItems.join(", ")}, ` +
+                `if applicable.`;
+        }
+
+        grouped.push({
+            type: "group",
+            item: group.label,
+            description: description
+        });
+    });
+
+    /*
+     * Preserve non-grouped insights such as experience
+     * and qualifications.
+     */
+    values.forEach((value, index) => {
+        if (!usedIndexes.has(index)) {
+            grouped.push(value);
+        }
+    });
+
+    return grouped;
+}
+
+function displayInsightResults(data) {
+    const insightSections = [
+        {
+            elementId: "strengths-list",
+            values: groupInsightValues(
+                data.strengths,
+                "strengths"
+            ),
+            emptyMessage: "No strengths identified."
+        },
+        {
+            elementId: "weaknesses-list",
+            values: groupInsightValues(
+                data.weaknesses,
+                "weaknesses"
+            ),
+            emptyMessage: "No areas to improve identified."
+        },
+        {
+            elementId: "recommendations-list",
+            values: groupInsightValues(
+                data.recommendations,
+                "recommendations"
+            ),
+            emptyMessage: "No recommendations available."
+        }
+    ];
+
+    insightSections.forEach((section) => {
+        const element = document.getElementById(
+            section.elementId
+        );
+
+        element.innerHTML = "";
+
+        const values = Array.isArray(section.values)
+            ? section.values
+            : [];
+
+        if (values.length === 0) {
+            const item = document.createElement("li");
+
+            item.textContent = section.emptyMessage;
+
+            element.appendChild(item);
+
+            return;
+        }
+
+        values.forEach((value) => {
+            const item = document.createElement("li");
+
+            if (typeof value === "object" && value !== null) {
+                item.textContent =
+                    value.description ||
+                    value.recommendation ||
+                    value.item ||
+                    "No insight available.";
+            } else {
+                item.textContent = value;
+            }
+
+            element.appendChild(item);
+        });
+    });
+}
+
+analyzeButton.addEventListener("click", async () => {
+    const resumeFile = resumeInput.files[0];
+    const jobDescription = jobDescriptionInput.value.trim();
+
+    if (!resumeFile) {
+        alert("Please select a resume.");
+        return;
+    }
+
+    if (!jobDescription) {
+        alert("Please enter a job description.");
+        return;
+    }
+
+    const formData = new FormData();
+
+    formData.append("resume", resumeFile);
+    formData.append(
+        "job_description",
+        jobDescription
+    );
+
+    analyzeButton.disabled = true;
+    analyzeButton.textContent = "Analyzing...";
+
+    try {
+        const response = await fetch(
+            "/api/analyze",
+            {
+                method: "POST",
+                body: formData,
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(
+                data.message || "Analysis failed."
+            );
+        }
+
+        console.log("ATS analysis result:", data);
+
+        window.atsAnalysisResult = data;
+
+        displayScoreResults(data);
+        displayMatchResults(data);
+        displayInsightResults(data);
+
+    } catch (error) {
+        console.error(
+            "ATS analysis error:",
+            error
+        );
+
+        alert(error.message);
+
+    } finally {
+        analyzeButton.disabled = false;
+        analyzeButton.textContent = "Analyze Resume";
+    }
+});
