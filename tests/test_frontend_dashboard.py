@@ -29,3 +29,16 @@ def test_home_page_contains_score_elements():
     assert b"experience-score" in response.data
     assert b"qualifications-score" in response.data
     assert b"keywords-score" in response.data
+
+def test_home_page_contains_score_breakdown():
+    app = create_app()
+    app.config["TESTING"] = True
+
+    client = app.test_client()
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+
+    assert b"score-breakdown" in response.data
+    assert b"score-breakdown-list" in response.data

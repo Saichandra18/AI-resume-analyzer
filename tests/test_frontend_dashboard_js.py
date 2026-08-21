@@ -32,3 +32,33 @@ def test_dashboard_javascript_displays_results():
 
     assert "atsAnalysisResult" in javascript
     assert "results" in javascript
+
+def test_dashboard_javascript_uses_score_explanation():
+    js_path = (
+        Path(__file__).resolve().parents[1]
+        / "frontend"
+        / "static"
+        / "js"
+        / "app.js"
+    )
+
+    javascript = js_path.read_text(encoding="utf-8")
+
+    assert "score_explanation" in javascript
+    assert "score-breakdown-list" in javascript
+    assert "component.contribution" in javascript
+
+def test_dashboard_javascript_uses_score_explanation():
+    js_path = (
+        Path(__file__).resolve().parents[1]
+        / "frontend"
+        / "static"
+        / "js"
+        / "app.js"
+    )
+
+    javascript = js_path.read_text(encoding="utf-8")
+
+    assert "score_explanation" in javascript
+    assert "score-breakdown-list" in javascript
+    assert "component.contribution" in javascript

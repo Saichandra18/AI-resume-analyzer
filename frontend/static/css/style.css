@@ -212,3 +212,34 @@ button:hover {
         grid-template-columns: 1fr;
     }
 }
+
+.score-breakdown {
+    background: white;
+    margin-top: 24px;
+    padding: 24px;
+    border-radius: 12px;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.06);
+}
+
+.score-breakdown h2 {
+    margin-top: 0;
+}
+
+.score-breakdown-item {
+    padding: 14px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.score-breakdown-item:last-child {
+    border-bottom: none;
+}
+
+.score-breakdown-item h3 {
+    margin: 0 0 6px;
+    font-size: 16px;
+}
+
+.score-breakdown-item p {
+    margin: 0;
+    font-size: 14px;
+}

@@ -54,6 +54,55 @@ function displayScoreResults(data) {
             : "N/A";
 
     resultsSection.style.display = "block";
+
+    const scoreBreakdown = document.getElementById(
+        "score-breakdown-list"
+    );
+
+    scoreBreakdown.innerHTML = "";
+
+    const explanation =
+        data.score_explanation || {};
+
+    const components =
+        explanation.components || {};
+
+    const componentLabels = {
+        skills: "Skills",
+        experience: "Experience",
+        qualifications: "Qualifications",
+        keywords: "Keywords"
+    };
+
+    Object.entries(componentLabels).forEach(
+        ([key, label]) => {
+            const component = components[key];
+
+            if (!component || component.score == null) {
+                return;
+            }
+
+            const item = document.createElement("div");
+
+            item.className = "score-breakdown-item";
+
+            const title = document.createElement("h3");
+
+            title.textContent = label;
+
+            const details = document.createElement("p");
+
+            details.textContent =
+                `Score: ${Math.round(component.score)}% | ` +
+                `Weight: ${Math.round(component.weight)}% | ` +
+                `Contribution: ${component.contribution} points`;
+
+            item.appendChild(title);
+            item.appendChild(details);
+
+            scoreBreakdown.appendChild(item);
+        }
+    );
 }
 
 function displayMatchResults(data) {
