@@ -105,6 +105,275 @@ function displayScoreResults(data) {
     );
 }
 
+function displayResumeQuality(data) {
+    const resume_quality = data.resume_quality || {};
+
+    const scoreElement = document.getElementById(
+        "resume-quality-score"
+    );
+
+    const componentsElement = document.getElementById(
+        "resume-quality-components"
+    );
+
+    const missingElement = document.getElementById(
+        "resume-quality-missing"
+    );
+
+    const optionalElement = document.getElementById(
+        "resume-quality-optional"
+    );
+
+    scoreElement.textContent =
+        resume_quality.score != null
+            ? `${resume_quality.score} / 100`
+            : "N/A";
+
+    componentsElement.innerHTML = "";
+
+    const components =
+        resume_quality.components || {};
+
+    Object.entries(components).forEach(
+        ([name, component]) => {
+            const item = document.createElement("div");
+
+            item.className =
+                "resume-quality-component";
+
+            const label = document.createElement("span");
+
+        const labelText = {
+            name: "Name",
+            email: "Email",
+            phone: "Phone",
+            skills: "Skills",
+            education: "Education",
+            experience: "Experience",
+            projects: "Projects",
+            certifications: "Certifications"
+        };
+
+label.textContent =
+    labelText[name] || name;
+
+            const status = document.createElement("span");
+
+            status.textContent =
+                component.present
+                    ? `✓ ${component.score}`
+                    : "Missing";
+
+            item.appendChild(label);
+            item.appendChild(status);
+
+            componentsElement.appendChild(item);
+        }
+    );
+
+    missingElement.innerHTML = "";
+
+    const missingSections =
+        resume_quality.missing_sections || [];
+
+    if (missingSections.length === 0) {
+        const item = document.createElement("li");
+
+        item.textContent =
+            "No required sections are missing.";
+
+        missingElement.appendChild(item);
+    } else {
+        missingSections.forEach((section) => {
+            const item = document.createElement("li");
+
+            item.textContent = section;
+
+            missingElement.appendChild(item);
+        });
+    }
+
+    optionalElement.innerHTML = "";
+
+    const optionalSections =
+        resume_quality.optional_sections || {};
+
+    Object.entries(optionalSections).forEach(
+        ([name, section]) => {
+            const item = document.createElement("li");
+
+            item.textContent =
+                section.present
+                    ? `${name}: Present`
+                    : `${name}: Not detected`;
+
+            optionalElement.appendChild(item);
+        }
+    );
+
+    /*
+     * Resume completeness fields
+     */
+
+    const fields = [
+        "name",
+        "email",
+        "phone",
+        "skills",
+        "education",
+        "experience",
+        "projects",
+        "certifications"
+    ];
+
+    fields.forEach((field) => {
+        const element = document.getElementById(
+            `resume-quality-${field}`
+        );
+
+        if (!element) {
+            return;
+        }
+
+        if (field === "certifications") {
+            const certification =
+                resume_quality.optional_sections?.certifications;
+
+            element.textContent =
+                certification?.present
+                    ? "Present"
+                    : "Not detected";
+
+            return;
+        }
+
+        const component =
+            resume_quality.components?.[field];
+
+        element.textContent =
+            component?.present
+                ? "Present"
+                : "Not detected";
+    });
+}
+
+function displayResumeContentQuality(data) {
+    const resume_content_quality =
+        data.resume_content_quality || {};
+
+    const scoreElement = document.getElementById(
+        "resume-content-quality-score"
+    );
+
+    const signalsElement = document.getElementById(
+        "resume-content-quality-signals"
+    );
+
+    const warningsElement = document.getElementById(
+        "resume-content-quality-warnings"
+    );
+
+    const recommendationsElement = document.getElementById(
+        "resume-content-quality-recommendations"
+    );
+
+    if (!scoreElement) {
+        return;
+    }
+
+    scoreElement.textContent =
+        resume_content_quality.score ?? 0;
+
+    const signals =
+        resume_content_quality.signals || {};
+
+    const signalLabels = {
+        contact_information:
+            "content-quality-contact-information",
+
+        quantified_achievements:
+            "content-quality-quantified-achievements",
+
+        action_oriented_experience:
+            "content-quality-action-oriented-experience",
+
+        project_description:
+            "content-quality-project-description"
+    };
+
+    Object.entries(signalLabels).forEach(
+        ([name, elementId]) => {
+            const element = document.getElementById(
+                elementId
+            );
+
+            if (!element) {
+                return;
+            }
+
+            const present = signals[name];
+
+            element.textContent = present
+                ? "Present"
+                : "Not detected";
+        }
+    );
+
+    warningsElement.innerHTML = "";
+
+    const warnings =
+        Array.isArray(resume_content_quality.warnings)
+            ? resume_content_quality.warnings
+            : [];
+
+    if (warnings.length === 0) {
+        const item = document.createElement("li");
+
+        item.textContent =
+            "No content-quality warnings.";
+
+        warningsElement.appendChild(item);
+    } else {
+        warnings.forEach((warning) => {
+            const item = document.createElement("li");
+
+            item.textContent = warning;
+
+            warningsElement.appendChild(item);
+        });
+    }
+
+    recommendationsElement.innerHTML = "";
+
+    const recommendations =
+        Array.isArray(
+            resume_content_quality.recommendations
+        )
+            ? resume_content_quality.recommendations
+            : [];
+
+    if (recommendations.length === 0) {
+        const item = document.createElement("li");
+
+        item.textContent =
+            "No content-quality recommendations.";
+
+        recommendationsElement.appendChild(item);
+    } else {
+        recommendations.forEach(
+            (recommendation) => {
+                const item =
+                    document.createElement("li");
+
+                item.textContent = recommendation;
+
+                recommendationsElement.appendChild(
+                    item
+                );
+            }
+        );
+    }
+}
 function displayMatchResults(data) {
     const matchSections = [
         {
@@ -595,6 +864,8 @@ analyzeButton.addEventListener("click", async () => {
         displayScoreResults(data);
         displayMatchResults(data);
         displayInsightResults(data);
+        displayResumeQuality(data);
+        displayResumeContentQuality(data);
 
     } catch (error) {
         console.error(

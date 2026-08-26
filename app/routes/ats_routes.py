@@ -9,6 +9,10 @@ from app.recommendation_engine import generate_recommendations
 from app.score_explainer import explain_ats_score
 from app.services.resume_parser import extract_structured_resume
 from app.strengths_weaknesses import generate_strengths_weaknesses
+from app.resume_quality_analyzer import analyze_resume_quality
+from app.resume_content_quality import (
+    analyze_resume_content_quality
+)
 
 
 ats_bp = Blueprint("ats", __name__)
@@ -69,6 +73,13 @@ def analyze_resume():
             file_path
         )
 
+        resume_quality = analyze_resume_quality(
+            resume_data
+        )
+        resume_content_quality = analyze_resume_content_quality(
+            resume_data
+        )
+
         result = analyze_resume_against_job(
             resume_data,
             job_description,
@@ -96,8 +107,9 @@ def analyze_resume():
 
             # New user-facing formatted result
             **formatted_result,
-
             # Phase 6 analysis
+            "resume_quality": resume_quality,
+            "resume_content_quality": resume_content_quality,
             "score_explanation": score_explanation,
             "strengths": strengths_weaknesses["strengths"],
             "weaknesses": strengths_weaknesses["weaknesses"],

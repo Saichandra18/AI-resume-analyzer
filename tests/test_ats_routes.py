@@ -2,6 +2,8 @@ from io import BytesIO
 
 from app import create_app
 
+from app.resume_quality_analyzer import analyze_resume_quality
+
 
 def test_ats_analysis_success(tmp_path):
     from docx import Document
@@ -93,6 +95,29 @@ def test_ats_analysis_success(tmp_path):
     assert "weaknesses" in data
 
     assert "recommendations" in data
+
+    assert "resume_quality" in data
+
+    resume_quality = data["resume_quality"]
+
+    assert "score" in resume_quality
+    assert 0 <= resume_quality["score"] <= 100
+
+    assert "components" in resume_quality
+    assert "missing_sections" in resume_quality
+    assert "optional_sections" in resume_quality
+
+    assert "name" in resume_quality["components"]
+    assert "email" in resume_quality["components"]
+    assert "phone" in resume_quality["components"]
+    assert "skills" in resume_quality["components"]
+    assert "education" in resume_quality["components"]
+    assert "experience" in resume_quality["components"]
+    assert "projects" in resume_quality["components"]
+
+    assert "certifications" in (
+        resume_quality["optional_sections"]
+    )
 
 
 def test_ats_analysis_missing_resume():
