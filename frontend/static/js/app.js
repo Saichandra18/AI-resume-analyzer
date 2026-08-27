@@ -374,6 +374,111 @@ function displayResumeContentQuality(data) {
         );
     }
 }
+
+function displayImprovementSuggestions(data) {
+    const container = document.getElementById(
+        "resume-improvement-suggestions"
+    );
+
+    if (!container) {
+        return;
+    }
+
+    container.innerHTML = "";
+
+    const suggestions =
+        Array.isArray(data.improvement_suggestions)
+            ? data.improvement_suggestions
+            : [];
+
+    if (suggestions.length === 0) {
+        const message = document.createElement("p");
+
+        message.textContent =
+            "No improvement suggestions available.";
+
+        container.appendChild(message);
+
+        return;
+    }
+
+    suggestions.forEach((suggestion) => {
+        const card = document.createElement("div");
+
+        card.className =
+            "resume-improvement-suggestion";
+
+        const header = document.createElement("div");
+
+        header.className =
+            "resume-improvement-header";
+
+        const type = document.createElement("strong");
+
+        type.textContent =
+            `${formatLabel(
+                suggestion.type || "Improvement"
+            )} • ${
+                suggestion.priority || "medium"
+            }`;
+
+        header.appendChild(type);
+
+        card.appendChild(header);
+
+        if (suggestion.current_text) {
+            const currentLabel =
+                document.createElement("strong");
+
+            currentLabel.textContent =
+                "Current Text";
+
+            const currentText =
+                document.createElement("p");
+
+            currentText.textContent =
+                suggestion.current_text;
+
+            card.appendChild(currentLabel);
+            card.appendChild(currentText);
+        }
+
+        const suggestionLabel =
+            document.createElement("strong");
+
+        suggestionLabel.textContent =
+            "How to Improve";
+
+        const suggestionText =
+            document.createElement("p");
+
+        suggestionText.textContent =
+            suggestion.suggestion ||
+            "No improvement suggestion available.";
+
+        card.appendChild(suggestionLabel);
+        card.appendChild(suggestionText);
+
+        const reasonLabel =
+            document.createElement("strong");
+
+        reasonLabel.textContent =
+            "Why";
+
+        const reasonText =
+            document.createElement("p");
+
+        reasonText.textContent =
+            suggestion.reason ||
+            "No reason provided.";
+
+        card.appendChild(reasonLabel);
+        card.appendChild(reasonText);
+
+        container.appendChild(card);
+    });
+}
+
 function displayMatchResults(data) {
     const matchSections = [
         {
@@ -866,6 +971,7 @@ analyzeButton.addEventListener("click", async () => {
         displayInsightResults(data);
         displayResumeQuality(data);
         displayResumeContentQuality(data);
+        displayImprovementSuggestions(data);
 
     } catch (error) {
         console.error(

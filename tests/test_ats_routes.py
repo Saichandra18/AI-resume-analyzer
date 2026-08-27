@@ -2,7 +2,6 @@ from io import BytesIO
 
 from app import create_app
 
-from app.resume_quality_analyzer import analyze_resume_quality
 
 
 def test_ats_analysis_success(tmp_path):
@@ -97,6 +96,24 @@ def test_ats_analysis_success(tmp_path):
     assert "recommendations" in data
 
     assert "resume_quality" in data
+
+    assert "improvement_suggestions" in data
+
+    improvement_suggestions = data[
+        "improvement_suggestions"
+    ]
+
+    assert isinstance(
+        improvement_suggestions,
+        list,
+    )
+
+    for suggestion in improvement_suggestions:
+        assert "type" in suggestion
+        assert "priority" in suggestion
+        assert "current_text" in suggestion
+        assert "suggestion" in suggestion
+        assert "reason" in suggestion
 
     resume_quality = data["resume_quality"]
 
@@ -196,3 +213,12 @@ def test_ats_analysis_unsupported_resume_format():
     data = response.get_json()
 
     assert data["status"] == "error"
+
+    assert response.status_code == 400
+
+    data = response.get_json()
+
+    assert data["status"] == "error"
+    assert data["message"] == (
+        "Unsupported file format. Use PDF or DOCX."
+    )

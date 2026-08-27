@@ -14,6 +14,9 @@ from app.resume_content_quality import (
     analyze_resume_content_quality
 )
 
+from app.resume_improvement import (
+    generate_improvement_suggestions
+)
 
 ats_bp = Blueprint("ats", __name__)
 
@@ -99,6 +102,15 @@ def analyze_resume():
             formatted_result
         )
 
+        improvement_suggestions = (
+            generate_improvement_suggestions(
+                resume_data,
+                resume_quality,
+                resume_content_quality,
+                formatted_result,
+            )
+        )
+
         return jsonify({
             "status": "success",
 
@@ -115,6 +127,9 @@ def analyze_resume():
             "weaknesses": strengths_weaknesses["weaknesses"],
             "recommendations": recommendations[
                 "recommendations"
+            ],
+            "improvement_suggestions": improvement_suggestions[
+                "improvement_suggestions"
             ],
         })
 
