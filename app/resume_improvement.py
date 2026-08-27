@@ -132,7 +132,7 @@ def _generate_section_suggestions(resume_quality):
     missing_sections = resume_quality.get(
         "missing_sections",
         [],
-    ) or {}
+    ) or []
 
     suggestions = []
 
