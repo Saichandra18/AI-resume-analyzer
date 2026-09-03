@@ -1,4 +1,5 @@
 from io import BytesIO
+from urllib import response
 
 from app import create_app
 
@@ -61,6 +62,7 @@ def test_ats_analysis_success(tmp_path):
             },
             content_type="multipart/form-data",
         )
+
 
     assert response.status_code == 200
 
@@ -135,6 +137,9 @@ def test_ats_analysis_success(tmp_path):
     assert "certifications" in (
         resume_quality["optional_sections"]
     )
+
+    assert "tailoring_plan" in response.get_json()
+    assert isinstance(response.get_json()["tailoring_plan"], dict)
 
 
 def test_ats_analysis_missing_resume():

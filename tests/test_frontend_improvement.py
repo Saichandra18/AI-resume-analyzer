@@ -115,3 +115,10 @@ def test_app_js_supports_ats_gap_suggestion_types():
     assert "skill" in javascript
     assert "keyword" in javascript
     assert "qualification" in javascript
+
+def test_app_js_defines_format_label_helper():
+    javascript = APP_JS_PATH.read_text(
+        encoding="utf-8"
+    )
+
+    assert "function formatLabel(" in javascript

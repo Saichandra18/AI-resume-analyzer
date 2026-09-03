@@ -18,6 +18,10 @@ from app.resume_improvement import (
     generate_improvement_suggestions
 )
 
+from app.resume_tailoring import (
+    generate_tailoring_plan
+)
+
 ats_bp = Blueprint("ats", __name__)
 
 UPLOAD_FOLDER = Path("uploads")
@@ -111,6 +115,16 @@ def analyze_resume():
             )
         )
 
+        tailoring_plan = generate_tailoring_plan(
+            resume_data,
+            formatted_result,
+            resume_quality,
+            resume_content_quality,
+            improvement_suggestions[
+                "improvement_suggestions"
+            ],
+        )
+
         return jsonify({
             "status": "success",
 
@@ -130,6 +144,9 @@ def analyze_resume():
             ],
             "improvement_suggestions": improvement_suggestions[
                 "improvement_suggestions"
+            ],
+            "tailoring_plan": tailoring_plan[
+                "tailoring_plan"
             ],
         })
 

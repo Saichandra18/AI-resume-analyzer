@@ -375,6 +375,20 @@ function displayResumeContentQuality(data) {
     }
 }
 
+function formatLabel(value) {
+    if (!value) {
+        return "";
+    }
+
+    return String(value)
+        .replace(/[_-]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .replace(/\b\w/g, (character) =>
+            character.toUpperCase()
+        );
+}
+
 function displayImprovementSuggestions(data) {
     const container = document.getElementById(
         "resume-improvement-suggestions"
@@ -476,6 +490,176 @@ function displayImprovementSuggestions(data) {
         card.appendChild(reasonText);
 
         container.appendChild(card);
+    });
+}
+
+function displayTailoringPlan(data) {
+    const plan = data.tailoring_plan || {};
+
+    const prioritiesContainer = document.getElementById(
+        "tailoring-priorities"
+    );
+    const summaryContainer = document.getElementById(
+        "tailoring-summary"
+    );
+    const skillsContainer = document.getElementById(
+        "tailoring-skills"
+    );
+    const experienceContainer = document.getElementById(
+        "tailoring-experience"
+    );
+    const keywordsContainer = document.getElementById(
+        "tailoring-keywords"
+    );
+    const qualificationsContainer = document.getElementById(
+        "tailoring-qualifications"
+    );
+    const warningsContainer = document.getElementById(
+        "tailoring-warnings"
+    );
+
+    const sections = [
+        {
+            container: prioritiesContainer,
+            items: plan.priorities || [],
+        },
+        {
+            container: summaryContainer,
+            items: plan.summary || [],
+        },
+        {
+            container: skillsContainer,
+            items: plan.skills || [],
+        },
+        {
+            container: experienceContainer,
+            items: plan.experience || [],
+        },
+        {
+            container: keywordsContainer,
+            items: plan.keywords || [],
+        },
+        {
+            container: qualificationsContainer,
+            items: plan.qualifications || [],
+        },
+    ];
+
+    const renderItems = (container, items) => {
+        if (!container) {
+            return;
+        }
+
+        container.innerHTML = "";
+
+        if (!items || items.length === 0) {
+            return;
+        }
+
+        items.forEach((item) => {
+            const card = document.createElement("div");
+
+            card.className =
+                "resume-tailoring-item";
+
+            const header = document.createElement("div");
+
+            header.className =
+                "resume-tailoring-header";
+
+            if (item.action) {
+                const action = document.createElement("strong");
+
+                action.textContent = item.action;
+
+                header.appendChild(action);
+            }
+
+            if (item.priority) {
+                const priority =
+                    document.createElement("span");
+
+                priority.className =
+                    "resume-tailoring-priority";
+
+                priority.textContent =
+                    item.priority;
+
+                header.appendChild(priority);
+            }
+
+            card.appendChild(header);
+
+            if (item.recommendation) {
+                const recommendation =
+                    document.createElement("p");
+
+                recommendation.textContent =
+                    item.recommendation;
+
+                card.appendChild(recommendation);
+            }
+
+            container.appendChild(card);
+        });
+    };
+
+    sections.forEach((section) => {
+        renderItems(
+            section.container,
+            section.items
+        );
+
+        const sectionWrapper =
+            section.container?.closest(
+                ".resume-tailoring-section"
+            );
+
+        if (sectionWrapper) {
+            sectionWrapper.style.display =
+                section.items.length > 0
+                    ? ""
+                    : "none";
+        }
+    });
+
+    if (!warningsContainer) {
+        return;
+    }
+
+    warningsContainer.innerHTML = "";
+
+    const warnings = plan.warnings || [];
+
+    if (warnings.length === 0) {
+        const sectionWrapper =
+            warningsContainer.closest(
+                ".resume-tailoring-section"
+            );
+
+        if (sectionWrapper) {
+            sectionWrapper.style.display = "none";
+        }
+
+        return;
+    }
+
+    const warningSection =
+        warningsContainer.closest(
+            ".resume-tailoring-section"
+        );
+
+    if (warningSection) {
+        warningSection.style.display = "";
+    }
+
+    warnings.forEach((warning) => {
+        const paragraph =
+            document.createElement("p");
+
+        paragraph.textContent = warning;
+
+        warningsContainer.appendChild(paragraph);
     });
 }
 
@@ -972,6 +1156,7 @@ analyzeButton.addEventListener("click", async () => {
         displayResumeQuality(data);
         displayResumeContentQuality(data);
         displayImprovementSuggestions(data);
+        displayTailoringPlan(data);
 
     } catch (error) {
         console.error(
