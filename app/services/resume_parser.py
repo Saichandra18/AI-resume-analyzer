@@ -1,4 +1,5 @@
 from pathlib import Path
+
 from pypdf import PdfReader
 from docx import Document
 
@@ -42,11 +43,23 @@ def extract_resume_text(file_path):
     if extension == ".docx":
         return extract_text_from_docx(file_path)
 
-    raise ValueError("Unsupported file format. Use PDF or DOCX.")
+    raise ValueError(
+        "Unsupported file format. Use PDF or DOCX."
+    )
 
-def extract_structured_resume(file_path):
-    """Extract and structure resume data from a PDF or DOCX file."""
 
-    resume_text = extract_resume_text(file_path)
+def extract_structured_resume(
+    file_path,
+    resume_text=None,
+):
+    """
+    Extract and structure resume data from a PDF or DOCX file.
+
+    If resume_text is supplied, reuse it instead of parsing
+    the document again.
+    """
+
+    if resume_text is None:
+        resume_text = extract_resume_text(file_path)
 
     return structure_resume(resume_text)

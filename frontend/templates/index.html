@@ -469,6 +469,694 @@
                     </div>
                 </div>
             </div>
+            <!-- AI RESUME REWRITING -->
+
+            <div
+                id="resume-rewrite"
+                class="resume-rewrite"
+            >
+
+                <div class="resume-quality-card">
+
+                    <h2>AI Resume Rewrite</h2>
+
+                    <p>
+                        Rewrite your existing resume content according
+                        to the tailoring plan while preserving your
+                        original facts.
+                    </p>
+
+                    <button
+                        type="button"
+                        id="rewrite-resume-button"
+                    >
+                        Rewrite Resume
+                    </button>
+
+                    <div
+                        id="rewrite-status"
+                        class="rewrite-status"
+                    ></div>
+                    <hr>
+
+                    <h2>Generate Optimized Resume</h2>
+
+                    <p>
+                        Generate a complete JD-optimized resume using your
+                        analyzed resume, tailoring plan, and rewritten content.
+                    </p>
+
+                    <div class="form-group">
+                        <label for="experience-level">
+                            Experience Level
+                        </label>
+
+                        <select
+                            id="experience-level"
+                            name="experience_level"
+                        >
+                            <option value="experienced">
+                                Experienced
+                            </option>
+
+                            <option value="fresher">
+                                Fresher
+                            </option>
+
+                            <option value="entry-level">
+                                Entry Level
+                            </option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="target-pages">
+                            Target Resume Pages
+                        </label>
+
+                        <select
+                            id="target-pages"
+                            name="target_pages"
+                        >
+                            <option value="1">
+                                1 Page
+                            </option>
+
+                            <option value="2">
+                                2 Pages
+                            </option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="target-job-title">
+                            Target Job Title
+                        </label>
+
+                        <input
+                            type="text"
+                            id="target-job-title"
+                            name="target_job_title"
+                            placeholder="e.g. Python Developer"
+                        >
+                    </div>
+                    <div class="form-group">
+                        <label for="target-job-title">
+                            Target Job Title
+                        </label>
+
+                        <input
+                            type="text"
+                            id="target-job-title"
+                            name="target_job_title"
+                            placeholder="e.g. Python Developer"
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="resume-template">
+                            Resume Template
+                        </label>
+
+                        <select
+                            id="resume-template"
+                            name="template"
+                        >
+                            <option value="default">
+                                Default
+                            </option>
+
+                            <option value="ats_clean" selected>
+                                ATS Clean
+                            </option>
+
+                            <option value="modern">
+                                Modern
+                            </option>
+
+                            <option value="technical">
+                                Technical
+                            </option>
+                        </select>
+
+                        <p class="form-help">
+                            Choose the visual format for your optimized resume.
+                            ATS Clean is designed for straightforward ATS parsing.
+                        </p>
+                    </div>
+
+                    <button
+                        type="button"
+                        id="generate-resume-button"
+                    >
+                        Generate Optimized Resume
+                    </button>
+
+                    <div
+                        id="generation-status"
+                        class="generation-status"
+                        aria-live="polite"
+                    >
+                        <div
+                            id="generation-progress"
+                            class="generation-progress"
+                            style="display: none;"
+                        >
+                            <div class="generation-progress-header">
+                                <strong>Generating Optimized Resume</strong>
+                                <span id="generation-progress-percent">0%</span>
+                            </div>
+
+                            <div class="generation-progress-bar">
+                                <div
+                                    id="generation-progress-fill"
+                                    class="generation-progress-fill"
+                                    style="width: 0%;"
+                                ></div>
+                            </div>
+
+                            <div class="generation-steps">
+
+                                <div
+                                    id="generation-step-prepare"
+                                    class="generation-step"
+                                >
+                                    <span class="generation-step-icon">○</span>
+                                    <span>Preparing resume data</span>
+                                </div>
+
+                                <div
+                                    id="generation-step-optimize"
+                                    class="generation-step"
+                                >
+                                    <span class="generation-step-icon">○</span>
+                                    <span>Optimizing content</span>
+                                </div>
+
+                                <div
+                                    id="generation-step-generate"
+                                    class="generation-step"
+                                >
+                                    <span class="generation-step-icon">○</span>
+                                    <span>Generating DOCX and PDF</span>
+                                </div>
+
+                                <div
+                                    id="generation-step-validate"
+                                    class="generation-step"
+                                >
+                                    <span class="generation-step-icon">○</span>
+                                    <span>Validating ATS and documents</span>
+                                </div>
+
+                                <div
+                                    id="generation-step-complete"
+                                    class="generation-step"
+                                >
+                                    <span class="generation-step-icon">○</span>
+                                    <span>Generation completed</span>
+                                </div>
+
+                            </div>
+                        </div>
+
+                        <div
+                            id="generation-status-message"
+                            class="generation-status-message"
+                        ></div>
+                    </div>
+                    <div
+                        id="generation-download"
+                        class="generation-download"
+                        style="display: none;"
+                    >
+                        <button
+                            type="button"
+                            id="download-resume-button"
+                        >
+                            Download DOCX
+                        </button>
+
+                        <button
+                            type="button"
+                            id="download-pdf-button"
+                        >
+                            Download PDF
+                        </button>
+                    </div>
+                                    <!-- GENERATION ATS RESULTS -->
+
+                    <div
+                        id="generation-ats-results"
+                        class="generation-ats-results"
+                        style="display: none;"
+                    >
+                        <div class="section-header">
+                            <h2>ATS Optimization Results</h2>
+                            <p>
+                                Compare your original resume with the optimized
+                                version generated for the target job description.
+                            </p>
+                        </div>
+
+                        <div class="ats-comparison-summary">
+
+                            <div class="ats-comparison-card">
+                                <span class="ats-comparison-label">
+                                    Before
+                                </span>
+
+                                <strong
+                                    id="generation-ats-before-score"
+                                    class="ats-comparison-score"
+                                >
+                                    --
+                                </strong>
+
+                                <span>ATS Score</span>
+                            </div>
+
+                            <div class="ats-comparison-arrow">
+                                →
+                            </div>
+
+                            <div class="ats-comparison-card">
+                                <span class="ats-comparison-label">
+                                    After
+                                </span>
+
+                                <strong
+                                    id="generation-ats-after-score"
+                                    class="ats-comparison-score"
+                                >
+                                    --
+                                </strong>
+
+                                <span>ATS Score</span>
+                            </div>
+
+                            <div class="ats-comparison-card">
+                                <span class="ats-comparison-label">
+                                    Improvement
+                                </span>
+
+                                <strong
+                                    id="generation-ats-improvement"
+                                    class="ats-comparison-score"
+                                >
+                                    --
+                                </strong>
+
+                                <span>Points</span>
+                            </div>
+
+                        </div>
+
+                        <div class="ats-component-comparison">
+                            <h3>Component Score Comparison</h3>
+
+                            <div
+                                id="generation-ats-component-scores"
+                                class="ats-component-scores"
+                            ></div>
+                        </div>
+
+                        <div class="ats-gap-comparison">
+
+                            <div class="ats-gap-section">
+                                <h3>Newly Matched Skills</h3>
+
+                                <ul id="generation-ats-new-skills">
+                                    <li>No newly matched skills.</li>
+                                </ul>
+                            </div>
+
+                            <div class="ats-gap-section">
+                                <h3>Remaining Missing Skills</h3>
+
+                                <ul id="generation-ats-missing-skills">
+                                    <li>No remaining missing skills.</li>
+                                </ul>
+                            </div>
+
+                            <div class="ats-gap-section">
+                                <h3>Newly Matched Keywords</h3>
+
+                                <ul id="generation-ats-new-keywords">
+                                    <li>No newly matched keywords.</li>
+                                </ul>
+                            </div>
+
+                            <div class="ats-gap-section">
+                                <h3>Remaining Missing Keywords</h3>
+
+                                <ul id="generation-ats-missing-keywords">
+                                    <li>No remaining missing keywords.</li>
+                                </ul>
+                            </div>
+
+                        </div>
+
+                        <div
+                            id="generation-ats-safety"
+                            class="ats-safety-status"
+                        >
+                            <strong>ATS Safety Check</strong>
+
+                            <span id="generation-ats-safety-status">
+                                Not evaluated
+                            </span>
+                        </div>
+
+                    </div>
+
+                </div>
+                <!-- GENERATION VALIDATION RESULTS -->
+
+                <div
+                    id="generation-validation-results"
+                    class="generation-validation-results"
+                    style="display: none;"
+                >
+                    <div class="section-header">
+                        <h2>Document Validation Results</h2>
+
+                        <p>
+                            Validation results for the generated DOCX and PDF resumes.
+                        </p>
+                    </div>
+
+                    <!-- OVERALL VALIDATION -->
+
+                    <div class="validation-overall-card">
+
+                        <div>
+                            <span class="validation-label">
+                                Overall Validation
+                            </span>
+
+                            <strong
+                                id="generation-validation-status"
+                                class="validation-status"
+                            >
+                                Not evaluated
+                            </strong>
+                        </div>
+
+                    </div>
+
+
+                    <!-- DOCUMENT VALIDATION -->
+
+                    <div class="validation-document-grid">
+
+                        <!-- DOCX -->
+
+                        <div class="validation-document-card">
+
+                            <h3>DOCX Validation</h3>
+
+                            <div class="validation-check-row">
+                                <span>File Exists</span>
+                                <strong id="generation-validation-docx-file">
+                                    --
+                                </strong>
+                            </div>
+
+                            <div class="validation-check-row">
+                                <span>Readable</span>
+                                <strong id="generation-validation-docx-readable">
+                                    --
+                                </strong>
+                            </div>
+
+                            <div class="validation-check-row">
+                                <span>Text Present</span>
+                                <strong id="generation-validation-docx-text">
+                                    --
+                                </strong>
+                            </div>
+
+                            <div class="validation-check-row">
+                                <span>Required Content</span>
+                                <strong id="generation-validation-docx-content">
+                                    --
+                                </strong>
+                            </div>
+
+                            <div class="validation-check-row">
+                                <span>Standard Headings</span>
+                                <strong id="generation-validation-docx-headings">
+                                    --
+                                </strong>
+                            </div>
+
+                        </div>
+
+
+                        <!-- PDF -->
+
+                        <div class="validation-document-card">
+
+                            <h3>PDF Validation</h3>
+
+                            <div class="validation-check-row">
+                                <span>File Exists</span>
+                                <strong id="generation-validation-pdf-file">
+                                    --
+                                </strong>
+                            </div>
+
+                            <div class="validation-check-row">
+                                <span>Readable</span>
+                                <strong id="generation-validation-pdf-readable">
+                                    --
+                                </strong>
+                            </div>
+
+                            <div class="validation-check-row">
+                                <span>Text Present</span>
+                                <strong id="generation-validation-pdf-text">
+                                    --
+                                </strong>
+                            </div>
+
+                            <div class="validation-check-row">
+                                <span>Required Content</span>
+                                <strong id="generation-validation-pdf-content">
+                                    --
+                                </strong>
+                            </div>
+
+                            <div class="validation-check-row">
+                                <span>Standard Headings</span>
+                                <strong id="generation-validation-pdf-headings">
+                                    --
+                                </strong>
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- PAGE COUNT -->
+
+                    <div class="validation-page-count-card">
+
+                        <h3>PDF Page Count</h3>
+
+                        <div class="validation-page-count">
+
+                            <div>
+                                <span>Target Pages</span>
+
+                                <strong id="generation-validation-target-pages">
+                                    --
+                                </strong>
+                            </div>
+
+                            <div>
+                                <span>Actual Pages</span>
+
+                                <strong id="generation-validation-actual-pages">
+                                    --
+                                </strong>
+                            </div>
+
+                            <div>
+                                <span>Page Count Match</span>
+
+                                <strong id="generation-validation-page-match">
+                                    --
+                                </strong>
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- ERRORS -->
+
+                    <div class="validation-message-card">
+
+                        <h3>Validation Errors</h3>
+
+                        <ul id="generation-validation-errors">
+                            <li>No validation errors.</li>
+                        </ul>
+
+                    </div>
+
+
+                    <!-- WARNINGS -->
+
+                    <div class="validation-message-card">
+
+                        <h3>Validation Warnings</h3>
+
+                        <ul id="generation-validation-warnings">
+                            <li>No validation warnings.</li>
+                        </ul>
+
+                    </div>
+
+                </div>
+
+
+                <!-- REWRITE RESULTS -->
+
+                <div
+                    id="rewrite-results"
+                    class="resume-rewrite-results"
+                    style="display: none;"
+                >
+
+                    <!-- VALIDATION -->
+
+                    <div class="resume-quality-card">
+
+                        <h2>Rewrite Validation</h2>
+
+                        <p>
+                            Grounding Status:
+                            <strong id="rewrite-grounding-status">
+                                --
+                            </strong>
+                        </p>
+
+                        <p>
+                            Meaning Preserved:
+                            <strong id="rewrite-meaning-preserved">
+                                --
+                            </strong>
+                        </p>
+
+                        <div>
+                            <h3>Validation Warnings</h3>
+
+                            <ul id="rewrite-validation-warnings">
+                            </ul>
+                        </div>
+
+                    </div>
+
+
+                    <!-- SUMMARY -->
+
+                    <div
+                        id="rewrite-summary"
+                        class="resume-quality-card"
+                    >
+
+                        <h2>Professional Summary</h2>
+
+                        <div class="rewrite-comparison">
+
+                            <div>
+                                <h3>Original</h3>
+
+                                <p id="rewrite-summary-original">
+                                    --
+                                </p>
+                            </div>
+
+                            <div>
+                                <h3>Rewritten</h3>
+
+                                <p id="rewrite-summary-rewritten">
+                                    --
+                                </p>
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- EXPERIENCE -->
+
+                    <div
+                        id="rewrite-experience"
+                        class="resume-quality-card"
+                    >
+
+                        <h2>Experience</h2>
+
+                        <div id="rewrite-experience-list">
+                        </div>
+
+                    </div>
+
+
+                    <!-- PROJECTS -->
+
+                    <div
+                        id="rewrite-projects"
+                        class="resume-quality-card"
+                    >
+
+                        <h2>Projects</h2>
+
+                        <div id="rewrite-projects-list">
+                        </div>
+
+                    </div>
+
+
+                    <!-- SKILLS -->
+
+                    <div
+                        id="rewrite-skills"
+                        class="resume-quality-card"
+                    >
+
+                        <h2>Skills</h2>
+
+                        <div class="rewrite-comparison">
+
+                            <div>
+                                <h3>Original Skills</h3>
+
+                                <ul id="rewrite-skills-original">
+                                </ul>
+                            </div>
+
+                            <div>
+                                <h3>Rewritten Skills</h3>
+
+                                <ul id="rewrite-skills-rewritten">
+                                </ul>
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
             <!-- INSIGHTS -->
 
             <div class="insights">

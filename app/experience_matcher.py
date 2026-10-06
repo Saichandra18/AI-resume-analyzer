@@ -13,7 +13,7 @@ def _parse_year_range(year_range):
         r"(Present|Current|\d{4})\s*$"
     )
 
-    match = re.match(pattern, year_range, re.IGNORECASE)
+    match = re.match(pattern, str(year_range), re.IGNORECASE)
 
     if not match:
         return None
@@ -74,16 +74,88 @@ def _calculate_experience_years(year_ranges):
     return total_years
 
 
+def _extract_resume_year_ranges(resume_experience):
+    """
+    Extract year ranges from supported resume experience structures.
+
+    Supported formats:
+
+    1. Legacy dictionary:
+        {
+            "years": ["2020 - 2022", "2022 - Present"]
+        }
+
+    2. Structured experience list:
+        [
+            {
+                "dates": "2020 - 2022"
+            },
+            {
+                "dates": "2022 - Present"
+            }
+        ]
+    """
+
+    if not resume_experience:
+        return []
+
+    # Existing dictionary-based contract.
+    if isinstance(resume_experience, dict):
+        years = resume_experience.get("years", [])
+
+        if isinstance(years, str):
+            return [years]
+
+        if isinstance(years, list):
+            return years
+
+        return []
+
+    # Current structured resume contract.
+    if isinstance(resume_experience, list):
+        year_ranges = []
+
+        for experience in resume_experience:
+            if not isinstance(experience, dict):
+                continue
+
+            dates = (
+                experience.get("dates")
+                or experience.get("date")
+                or experience.get("years")
+            )
+
+            if isinstance(dates, str):
+                year_ranges.append(dates)
+
+            elif isinstance(dates, list):
+                year_ranges.extend(dates)
+
+        return year_ranges
+
+    return []
+
+
 def match_experience(resume_experience, required_experience):
     """Compare resume experience against the JD experience requirement."""
 
     resume_experience = resume_experience or {}
     required_experience = required_experience or {}
 
-    year_ranges = resume_experience.get("years", [])
-    required_years = required_experience.get("min_years")
+    year_ranges = _extract_resume_year_ranges(
+        resume_experience
+    )
 
-    candidate_years = _calculate_experience_years(year_ranges)
+    required_years = None
+
+    if isinstance(required_experience, dict):
+        required_years = required_experience.get(
+            "min_years"
+        )
+
+    candidate_years = _calculate_experience_years(
+        year_ranges
+    )
 
     if required_years is None:
         return {

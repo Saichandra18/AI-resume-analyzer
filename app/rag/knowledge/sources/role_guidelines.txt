@@ -1,0 +1,155 @@
+Job Role and Requirement Alignment Guidelines
+
+Purpose
+
+Role alignment helps connect the requirements of a target position with the candidate's documented background. The goal is to emphasize relevant qualifications without introducing unsupported claims.
+
+Job Description Analysis
+
+A job description may contain:
+- Required skills
+- Preferred skills
+- Technologies and tools
+- Responsibilities
+- Qualifications
+- Experience requirements
+- Domain knowledge
+- Keywords and terminology
+
+These requirements describe the employer's expectations for the target role.
+
+Requirement Classification
+
+Classify job requirements according to their relationship with the candidate's documented background:
+
+- Direct match: the candidate explicitly demonstrates the requirement.
+- Related match: the candidate has closely related knowledge or technology that may be relevant.
+- Gap: the requirement is not supported by the candidate's resume.
+
+Direct matches can be emphasized confidently.
+
+Related matches should be described accurately and should not automatically be presented as equivalent to the requested requirement.
+
+Gaps should remain gaps unless additional verified candidate information supports the requirement.
+
+Skill Alignment
+
+Compare target-role skills with the skills documented in the candidate's resume.
+
+When terminology differs but the underlying capability is clearly supported, consistent terminology may improve clarity.
+
+Do not infer substantial expertise from a loosely related technology.
+
+Technology Alignment
+
+Technology names should be preserved accurately.
+
+For example, familiarity with one programming language, framework, database, cloud platform, or machine learning tool should not automatically be represented as experience with another technology.
+
+Related technologies may be highlighted as adjacent skills when the resume supports that relationship.
+
+Responsibility Alignment
+
+Target responsibilities can guide which existing resume content receives greater emphasis.
+
+If the candidate has documented work or project experience corresponding to a responsibility, that experience may be prioritized.
+
+If the responsibility is not supported by the resume, it must not be presented as something the candidate has performed.
+
+Experience Requirements
+
+Experience requirements in a job description should be compared with the candidate's documented experience.
+
+Do not create employment history, years of experience, seniority, job titles, or responsibilities to satisfy a requirement.
+
+For candidates with project-based or academic experience, those experiences may be presented as projects or academic work rather than being represented as professional employment.
+
+Domain Alignment
+
+Relevant domain knowledge can be emphasized when it is explicitly supported by the candidate's background.
+
+A target industry's presence in a job description does not establish that the candidate has experience in that industry.
+
+Missing domain experience should remain clearly distinguishable from demonstrated experience.
+
+Keyword Alignment
+
+Target-role terminology can be used when it accurately represents information already present in the candidate's resume.
+
+Keywords should be placed in context rather than inserted as isolated or repetitive terms.
+
+Keyword optimization must not override factual accuracy.
+
+Prioritization
+
+When tailoring a resume to a role, prioritize supported information that has the strongest relevance to the target requirements.
+
+Possible areas for prioritization include:
+- Relevant technical skills
+- Relevant projects
+- Relevant responsibilities
+- Relevant qualifications
+- Relevant achievements
+- Relevant tools and technologies
+
+Prioritization changes emphasis, not the underlying facts.
+
+Transferable Skills
+
+Transferable skills may be emphasized when the resume provides evidence for them.
+
+Examples may include:
+- Data analysis
+- Problem solving
+- Software development
+- Communication
+- Project execution
+- Research
+- Analytical thinking
+
+The wording should remain proportional to the evidence available in the candidate's resume.
+
+Gap Identification
+
+A missing requirement should be identified as a gap rather than silently incorporated into the resume.
+
+Useful gap categories include:
+- Missing technical skill
+- Missing tool or platform
+- Missing qualification
+- Missing experience
+- Missing domain knowledge
+- Missing responsibility evidence
+
+Gap information can guide recommendations without becoming candidate claims.
+
+Tailoring Principle
+
+Resume tailoring should answer:
+
+"What existing candidate information is most relevant to this role?"
+
+It should not answer:
+
+"What information can be invented to make the candidate appear to satisfy the role?"
+
+Grounding Principle
+
+Candidate claims must be grounded in candidate-provided information.
+
+Job descriptions provide requirements.
+
+Knowledge-base documents provide general optimization guidance.
+
+Neither a job description nor general knowledge-base guidance should be treated as evidence that the candidate possesses a skill, qualification, responsibility, or experience.
+
+Final Role Alignment Review
+
+Before finalizing a tailored resume, verify that:
+- Target requirements were identified correctly.
+- Supported matches receive appropriate emphasis.
+- Related skills remain accurately described.
+- Gaps are not presented as existing qualifications.
+- Candidate experience has not been fabricated.
+- Job-description terminology is used only when factually appropriate.
+- The final content remains faithful to the candidate's documented background.

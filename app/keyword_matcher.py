@@ -103,36 +103,176 @@ def extract_resume_keywords(resume_data):
         return set()
 
     keywords = set()
-
     text_parts = []
 
-    text_parts.extend(resume_data.get("skills", []))
+    # Skills
+    skills = resume_data.get("skills", [])
 
+    if isinstance(skills, str):
+        text_parts.append(skills)
+
+    elif isinstance(skills, list):
+        text_parts.extend(
+            item for item in skills
+            if isinstance(item, str)
+        )
+
+    # Education
     education = resume_data.get("education", {})
-    text_parts.extend(education.get("degrees", []))
 
-    experience = resume_data.get("experience", {})
-    text_parts.extend(experience.get("section", []))
-    text_parts.extend(experience.get("job_titles", []))
+    # Legacy dictionary-based education structure.
+    if isinstance(education, dict):
+        degrees = education.get("degrees", [])
 
-    text_parts.extend(resume_data.get("projects", []))
-    text_parts.extend(resume_data.get("certifications", []))
+        if isinstance(degrees, str):
+            text_parts.append(degrees)
 
+        elif isinstance(degrees, list):
+            text_parts.extend(
+                item for item in degrees
+                if isinstance(item, str)
+            )
+
+    # Current structured education-list format.
+    elif isinstance(education, list):
+        for education_item in education:
+            if not isinstance(education_item, dict):
+                continue
+
+            for field in (
+                "degree",
+                "degree_name",
+                "qualification",
+                "name",
+            ):
+                value = education_item.get(field)
+
+                if isinstance(value, str):
+                    text_parts.append(value)
+
+    # Experience
+    experience = resume_data.get("experience", [])
+
+    # Current structured experience-list format.
+    if isinstance(experience, list):
+        for experience_item in experience:
+            if not isinstance(experience_item, dict):
+                continue
+
+            for field in (
+                "job_title",
+                "company",
+                "location",
+                "description",
+                "summary",
+                "responsibilities",
+                "achievements",
+                "dates",
+            ):
+                value = experience_item.get(field)
+
+                if isinstance(value, str):
+                    text_parts.append(value)
+
+                elif isinstance(value, list):
+                    text_parts.extend(
+                        item for item in value
+                        if isinstance(item, str)
+                    )
+
+    # Legacy dictionary-based experience structure.
+    elif isinstance(experience, dict):
+        for value in experience.values():
+            if isinstance(value, str):
+                text_parts.append(value)
+
+            elif isinstance(value, list):
+                text_parts.extend(
+                    item for item in value
+                    if isinstance(item, str)
+                )
+
+    # Projects
+    projects = resume_data.get("projects", [])
+
+    if isinstance(projects, list):
+        for project in projects:
+            if isinstance(project, dict):
+                for value in project.values():
+                    if isinstance(value, str):
+                        text_parts.append(value)
+
+                    elif isinstance(value, list):
+                        text_parts.extend(
+                            item for item in value
+                            if isinstance(item, str)
+                        )
+
+            elif isinstance(project, str):
+                text_parts.append(project)
+
+    # Certifications
+    certifications = resume_data.get("certifications", [])
+
+    if isinstance(certifications, str):
+        text_parts.append(certifications)
+
+    elif isinstance(certifications, list):
+        text_parts.extend(
+            item for item in certifications
+            if isinstance(item, str)
+        )
+
+    # Summary / profile / raw text fields
+    for field in (
+        "summary",
+        "professional_summary",
+        "profile",
+        "objective",
+        "raw_text",
+        "text",
+    ):
+        value = resume_data.get(field)
+
+        if isinstance(value, str):
+            text_parts.append(value)
+
+    # Build searchable keywords.
+    #
+    # We preserve BOTH:
+    #   - individual words
+    #   - normalized multi-word phrases
+    #
+    # Example:
+    #   "Machine Learning"
+    # becomes:
+    #   "machine"
+    #   "learning"
+    #   "machine learning"
+    #
+    # "CI/CD"
+    # becomes:
+    #   "ci"
+    #   "cd"
+    #   "ci cd"
     for text in text_parts:
-        if not text:
+        if not isinstance(text, str):
             continue
 
-        normalized_text = normalize_keyword(text)
+        normalized = normalize_keyword(text)
 
-        if not normalized_text:
+        if not normalized:
             continue
 
-        words = normalized_text.split()
+        # Preserve the complete normalized phrase.
+        keywords.add(normalized)
 
-        keywords.update(words)
-
-        if len(words) > 1:
-            keywords.add(normalized_text)
+        # Also preserve individual tokens.
+        keywords.update(
+            token
+            for token in normalized.split()
+            if token
+        )
 
     return keywords
 

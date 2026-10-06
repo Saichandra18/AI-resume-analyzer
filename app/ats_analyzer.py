@@ -6,6 +6,65 @@ from app.keyword_matcher import match_keywords
 from app.score_engine import calculate_ats_score
 
 
+def _extract_resume_degrees(resume_education):
+    """
+    Extract degree values from supported resume education structures.
+
+    Supported formats:
+
+    1. Legacy dictionary:
+        {
+            "degrees": ["B.Tech", "M.Tech"]
+        }
+
+    2. Structured education list:
+        [
+            {
+                "degree": "B.Tech",
+                "institution": "Example University",
+                "year": "2024"
+            }
+        ]
+    """
+
+    if not resume_education:
+        return []
+
+    # Legacy dictionary-based structure.
+    if isinstance(resume_education, dict):
+        degrees = resume_education.get("degrees", [])
+
+        if isinstance(degrees, str):
+            return [degrees]
+
+        if isinstance(degrees, list):
+            return degrees
+
+        return []
+
+    # Current structured resume contract.
+    if isinstance(resume_education, list):
+        degrees = []
+
+        for education in resume_education:
+            if not isinstance(education, dict):
+                continue
+
+            degree = (
+                education.get("degree")
+                or education.get("degree_name")
+                or education.get("qualification")
+                or education.get("name")
+            )
+
+            if isinstance(degree, str):
+                degrees.append(degree)
+
+        return degrees
+
+    return []
+
+
 def analyze_resume_against_job(resume_data, job_description):
     """Analyze a structured resume against a job description."""
 
@@ -24,8 +83,11 @@ def analyze_resume_against_job(resume_data, job_description):
         job_analysis.get("experience"),
     )
 
+    education = resume_data.get("education", [])
+    resume_degrees = _extract_resume_degrees(education)
+
     qualification_result = match_qualifications(
-        resume_data.get("education", {}).get("degrees", []),
+        resume_degrees,
         job_analysis.get("qualifications", []),
     )
 

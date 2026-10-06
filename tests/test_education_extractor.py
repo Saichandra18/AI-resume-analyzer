@@ -62,3 +62,56 @@ def test_empty_text():
     assert find_education_section("") == []
     assert extract_degrees("") == []
     assert extract_education_years("") == []
+def test_extract_degrees_only_from_education_section():
+    text = """Education
+Bachelor of Technology in Computer Science
+ABC University
+2019 - 2023
+
+Experience
+Software Engineer
+2023 - Present
+
+Projects
+Machine Learning Engineer Project
+"""
+
+    degrees = extract_degrees(text)
+
+    assert degrees == [
+        "Bachelor of Technology in Computer Science"
+    ]
+
+
+def test_extract_education_years_only_from_education_section():
+    text = """Education
+Bachelor of Technology in Computer Science
+ABC University
+2019 - 2023
+
+Experience
+Software Engineer
+2023 - Present
+"""
+
+    years = extract_education_years(text)
+
+    assert years == ["2019", "2023"]
+
+def test_education_section_stops_at_professional_certifications():
+    text = """Education
+Bachelor of Technology in Computer Science
+Dadi Institute of Engineering and Technology
+2019 - 2023
+CGPA: 7.69
+
+Professional Certifications
+IBM AI Developer Professional Certificate
+IBM Generative AI Engineering Professional Certificate
+"""
+
+    education = find_education_section(text)
+
+    assert "Bachelor of Technology in Computer Science" in education
+    assert "Dadi Institute of Engineering and Technology" in education
+    assert "IBM AI Developer Professional Certificate" not in education

@@ -1,4 +1,7 @@
+
 from pathlib import Path
+import logging
+import uuid
 
 from app.services.text_cleaner import clean_resume_text
 
@@ -7,6 +10,8 @@ from werkzeug.utils import secure_filename
 
 from app.services.resume_parser import extract_resume_text
 
+
+logger = logging.getLogger(__name__)
 
 resume_bp = Blueprint("resume", __name__)
 
@@ -40,26 +45,60 @@ def upload_resume():
             "message": "Unsupported file format. Use PDF or DOCX."
         }), 400
 
-    UPLOAD_FOLDER.mkdir(exist_ok=True)
+    UPLOAD_FOLDER.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
 
-    filename = secure_filename(file.filename)
-    file_path = UPLOAD_FOLDER / filename
+    original_filename = secure_filename(file.filename)
 
-    file.save(file_path)
+    if not original_filename:
+        return jsonify({
+            "status": "error",
+            "message": "Invalid filename."
+        }), 400
+
+    # Use a unique server-side filename so that one upload
+    # cannot overwrite another uploaded resume.
+    unique_filename = (
+        f"{uuid.uuid4().hex}{extension}"
+    )
+
+    file_path = UPLOAD_FOLDER / unique_filename
 
     try:
+        file.save(file_path)
+
         resume_text = extract_resume_text(file_path)
         cleaned_text = clean_resume_text(resume_text)
 
         return jsonify({
             "status": "success",
             "message": "Resume uploaded successfully",
-            "filename": filename,
+            "filename": original_filename,
             "text": cleaned_text
         })
 
-    except Exception as error:
+    except Exception:
+        logger.exception(
+            "Failed to process uploaded resume."
+        )
+
         return jsonify({
             "status": "error",
-            "message": f"Could not process resume: {str(error)}"
+            "message": "Could not process resume."
         }), 500
+
+    finally:
+        # The extracted resume text is returned immediately,
+        # so the temporary uploaded file is no longer needed.
+        try:
+            if file_path.exists():
+                file_path.unlink()
+        except OSError:
+            logger.warning(
+                "Could not remove temporary uploaded file: %s",
+                file_path,
+                exc_info=True,
+            )
+

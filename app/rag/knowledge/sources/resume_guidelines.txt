@@ -1,0 +1,146 @@
+Resume Writing and Optimization Guidelines
+
+Purpose
+
+A strong resume should present the candidate's qualifications clearly, concisely, and accurately while making relevant information easy to identify.
+
+Professional Summary
+
+The professional summary should provide a concise overview of the candidate's relevant background, skills, technologies, qualifications, and career focus.
+
+The summary should prioritize information relevant to the target role.
+
+Do not introduce skills, experience, achievements, certifications, or qualifications that are not supported by the candidate's resume.
+
+Skills Section
+
+The skills section should contain technologies, tools, programming languages, frameworks, platforms, methodologies, and other capabilities that the candidate genuinely possesses.
+
+Group related skills when doing so improves readability.
+
+Prioritize skills that are relevant to the target job while retaining important supported skills.
+
+Do not add missing job requirements as candidate skills.
+
+Experience Section
+
+Experience descriptions should communicate the candidate's actual responsibilities, contributions, technologies, and outcomes.
+
+Use concise bullet points.
+
+Begin bullets with clear action-oriented language when appropriate.
+
+Where measurable results are genuinely available, present them clearly.
+
+Do not invent metrics, responsibilities, employers, job titles, dates, or achievements.
+
+Project Section
+
+Projects can demonstrate practical application of technologies and concepts, particularly when professional experience is limited.
+
+Project descriptions should identify:
+- Project purpose
+- Technologies used
+- Relevant implementation details
+- Meaningful outcomes when supported
+
+Projects should only claim work that the candidate actually performed.
+
+Achievement-Oriented Writing
+
+When supported by the source resume, describe work in terms of action, technical contribution, and result.
+
+A useful structure is:
+
+Action + technical contribution + outcome
+
+For example, a candidate may describe how they implemented a system, used a technology, analyzed data, or improved an existing process when those activities are supported by their documented background.
+
+Do not manufacture outcomes merely to make a bullet appear stronger.
+
+Keyword Alignment
+
+Use terminology from the target job description when it accurately corresponds to the candidate's existing background.
+
+Equivalent terminology may be useful when the relationship is clear and factually supported.
+
+Do not transform a related skill into an unsupported claim of direct experience.
+
+Content Prioritization
+
+Give greater emphasis to information that is:
+- Relevant to the target position
+- Supported by the candidate's resume
+- Technically meaningful
+- Recent or substantial when applicable
+- Useful for demonstrating qualifications
+
+Less relevant information can receive less emphasis, but factual information should not be altered.
+
+Length and Conciseness
+
+Resume content should be concise and avoid unnecessary repetition.
+
+Remove redundant wording when the same information is already communicated effectively elsewhere.
+
+Do not remove important qualifications, projects, skills, or achievements solely to reduce length.
+
+Consistency
+
+Maintain consistent:
+- Section headings
+- Date formats
+- Job-title formatting
+- Organization names
+- Bullet styles
+- Technology names
+- Capitalization
+
+Consistency improves readability and makes information easier to process.
+
+Formatting
+
+Prefer clean and machine-readable layouts.
+
+Important information should be represented as selectable text rather than images.
+
+Avoid unnecessary decorative elements that interfere with text extraction or readability.
+
+Factual Integrity
+
+Resume optimization must preserve the candidate's factual record.
+
+The following must not be fabricated:
+- Skills
+- Work experience
+- Job titles
+- Employers
+- Dates
+- Certifications
+- Degrees
+- Responsibilities
+- Projects
+- Metrics
+- Achievements
+
+A job description describes employer requirements. It does not establish that the candidate satisfies those requirements.
+
+Skill Gaps
+
+When a job requirement is not supported by the candidate's resume, treat it as a skill or qualification gap.
+
+Do not silently add the missing requirement to the resume.
+
+When appropriate, related existing skills may be emphasized without misrepresenting them as the missing skill.
+
+Final Review
+
+Before producing an optimized resume, verify that:
+- Relevant information is easy to find.
+- Job-relevant supported skills are appropriately emphasized.
+- The resume remains factually accurate.
+- No unsupported claims were introduced.
+- Repetition has been minimized.
+- Formatting is consistent.
+- Content remains readable.
+- The final resume reflects the candidate's actual background.

@@ -1,0 +1,91 @@
+﻿ATS Resume Optimization Guidelines
+
+Purpose
+
+Applicant Tracking Systems (ATS) commonly process resumes by extracting text, identifying sections, and matching terminology against job requirements. Resume optimization should improve machine-readable relevance without sacrificing factual accuracy or readability.
+
+Keyword Usage
+
+Use terminology from the job description when it accurately describes the candidate's existing skills, tools, technologies, responsibilities, or qualifications.
+
+Prefer exact or commonly recognized terminology when the candidate genuinely has the corresponding skill or experience.
+
+Do not add a technology, certification, responsibility, job title, or qualification merely because it appears in a job description.
+
+Avoid unnecessary keyword repetition. Keywords should appear naturally in relevant resume sections.
+
+Skill Matching
+
+Compare the candidate's documented skills against the requirements of the target job.
+
+Distinguish between:
+- Explicitly stated skills
+- Closely related terminology
+- Skills that are not supported by the resume
+
+Only explicitly supported candidate skills should be presented as possessed skills.
+
+Section Structure
+
+Use recognizable section headings such as:
+- Summary
+- Skills
+- Experience
+- Projects
+- Education
+- Certifications
+
+Consistent section headings help automated systems and human reviewers identify resume content.
+
+Formatting
+
+Prefer simple, machine-readable formatting.
+
+Avoid relying on images, graphics, text embedded inside images, decorative elements, or complex layouts to communicate important information.
+
+Use consistent formatting for dates, titles, organizations, technologies, and bullet points.
+
+Content Relevance
+
+Prioritize information that is relevant to the target job.
+
+Relevant skills, technologies, responsibilities, projects, qualifications, and measurable achievements should receive appropriate emphasis when supported by the candidate's resume.
+
+Do not remove important factual information solely to increase keyword density.
+
+Accuracy and Grounding
+
+Resume optimization must preserve factual accuracy.
+
+A job description is evidence of what an employer is seeking, not evidence that the candidate possesses those requirements.
+
+General ATS guidance may explain how to present information, but it must never be used as evidence of candidate experience.
+
+Missing Skills
+
+When a required skill is absent from the candidate's resume, identify it as a gap rather than adding it to the resume as an existing skill.
+
+Related skills may be emphasized when they are genuinely present, but related terminology must not be represented as direct experience unless the resume supports that interpretation.
+
+Keyword Placement
+
+When a supported keyword is relevant, it can be naturally incorporated into:
+- Professional summary
+- Skills section
+- Experience bullets
+- Project descriptions
+- Other appropriate resume sections
+
+The placement should reflect the candidate's actual background.
+
+Resume Quality
+
+ATS optimization should balance:
+- Relevance
+- Accuracy
+- Readability
+- Consistent structure
+- Appropriate keyword usage
+- Factual grounding
+
+Optimization should improve discoverability while preserving the truth of the candidate's background.

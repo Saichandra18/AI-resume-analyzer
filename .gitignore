@@ -12,6 +12,16 @@ venv/
 # Uploaded resumes
 uploads/*
 
+# Generated application artifacts
+generated_resumes/
+generation_request.json
+knowledge_index.json
+resume_text.txt
+project_tree.txt
+
+# RAG generated data
+generated_rag/
+
 # Database
 *.db
 *.sqlite
