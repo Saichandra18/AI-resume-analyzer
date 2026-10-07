@@ -1,56 +1,37 @@
-import os
-
-from dotenv import load_dotenv
-from openai import OpenAI
-
-
-load_dotenv()
+from .providers import OpenAIProvider
 
 
 class OpenAIClient:
-    """Thin wrapper around the OpenAI Responses API."""
+    """
+    Backward-compatible wrapper around OpenAIProvider.
 
-    def __init__(
-        self,
-        api_key=None,
-        model=None,
-    ):
-        self.api_key = (
-            api_key
-            or os.getenv("OPENAI_API_KEY")
+    Existing application code can continue using OpenAIClient
+    while the underlying architecture uses the generic
+    LLMProvider abstraction.
+    """
+
+    def __init__(self, api_key=None, model=None):
+        self.provider = OpenAIProvider(
+            api_key=api_key,
+            model=model,
         )
 
-        self.model = (
-            model
-            or os.getenv(
-                "OPENAI_MODEL",
-                "gpt-5.6-luna",
-            )
-        )
+    @property
+    def api_key(self):
+        return self.provider.api_key
 
-        if not self.api_key:
-            raise ValueError(
-                "OPENAI_API_KEY is not configured."
-            )
+    @property
+    def model(self):
+        return self.provider.model
 
-        self.client = OpenAI(
-            api_key=self.api_key
-        )
+    @property
+    def client(self):
+        return self.provider.client
 
-    def generate(
-        self,
-        prompt,
-    ):
-        """Generate a text response from OpenAI."""
+    @client.setter
+    def client(self, value):
+        self.provider.client = value
 
-        if not prompt or not str(prompt).strip():
-            raise ValueError(
-                "Prompt must not be empty."
-            )
-
-        response = self.client.responses.create(
-            model=self.model,
-            input=prompt,
-        )
-
-        return response.output_text
+    def generate(self, prompt):
+        """Generate text through the configured LLM provider."""
+        return self.provider.generate(prompt)

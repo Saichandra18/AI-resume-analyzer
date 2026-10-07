@@ -2023,7 +2023,7 @@ def generate_optimized_resume(
         original_resume_data=resume_data,
         job_description=job_description,
         ats_result=ats_result if ats_result else None,
-        allow_single_token_keywords=rag_optimization is not None,
+        allow_single_token_keywords=rag_service is not None,
     )
 
     final_resume = build_final_resume(
@@ -2082,7 +2082,7 @@ def generate_optimized_resume(
         original_resume_data=resume_data,
         job_description=job_description,
         ats_result=ats_result if ats_result else None,
-        allow_single_token_keywords=rag_optimization is not None,
+        allow_single_token_keywords=rag_service is not None,
     )
 
     # Run the deterministic cleanup once more because keyword
