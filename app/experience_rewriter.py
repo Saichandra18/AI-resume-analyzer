@@ -1,4 +1,5 @@
-from app.ai.client import OpenAIClient
+from app.ai import create_llm_provider
+from app.ai.providers import LLMProvider
 from app.rewrite_models import build_rewrite_output
 import json
 from app.rewrite_validator import validate_rewrite
@@ -17,7 +18,7 @@ def rewrite_experience(
     if not experience:
         return build_rewrite_output()
 
-    client = client or OpenAIClient()
+    client = client or create_llm_provider()
 
     prompt = f"""
 Rewrite the following existing resume experience content.

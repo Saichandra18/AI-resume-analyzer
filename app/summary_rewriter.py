@@ -1,6 +1,7 @@
 import json
 
-from app.ai.client import OpenAIClient
+from app.ai import create_llm_provider
+from app.ai.providers import LLMProvider
 from app.rewrite_models import build_rewrite_output
 from app.rewrite_validator import validate_rewrite
 
@@ -10,14 +11,14 @@ def rewrite_summary(
     resume_data=None,
     tailoring_plan=None,
     job_description="",
-    client=None,
+    client: LLMProvider | None = None,
 ):
     """Rewrite the existing professional summary using AI."""
 
     if not resume_text or not str(resume_text).strip():
         return build_rewrite_output()
 
-    client = client or OpenAIClient()
+    client = client or create_llm_provider()
 
     prompt = f"""
 Rewrite the existing professional summary from the resume below.

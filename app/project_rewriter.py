@@ -1,6 +1,7 @@
 import json
 
-from app.ai.client import OpenAIClient
+from app.ai import create_llm_provider
+from app.ai.providers import LLMProvider
 from app.rewrite_models import build_rewrite_output
 from app.rewrite_validator import validate_rewrite
 
@@ -11,14 +12,14 @@ def rewrite_projects(
     resume_data=None,
     tailoring_plan=None,
     job_description="",
-    client=None,
+    client: LLMProvider | None = None,
 ):
     """Rewrite existing resume project content using AI."""
 
     if not projects:
         return build_rewrite_output()
 
-    client = client or OpenAIClient()
+    client = client or create_llm_provider()
 
     prompt = f"""
 Rewrite the following existing resume project content.

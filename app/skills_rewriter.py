@@ -3,7 +3,8 @@
 import json
 import re
 
-from app.ai.client import OpenAIClient
+from app.ai import create_llm_provider
+from app.ai.providers import LLMProvider
 from app.rewrite_models import build_rewrite_output
 from app.rewrite_validator import validate_rewrite
 
@@ -267,14 +268,14 @@ def rewrite_skills(
     resume_data=None,
     tailoring_plan=None,
     job_description="",
-    client=None,
+    client: LLMProvider | None = None,
 ):
     """Improve existing resume skills using grounded AI rewriting."""
 
     if not skills:
         return build_rewrite_output()
 
-    client = client or OpenAIClient()
+    client = client or create_llm_provider()
 
     prompt = f"""
 Improve the existing skills section of the resume.

@@ -1,3 +1,5 @@
+from app.ai import create_llm_provider
+from app.ai.providers import LLMProvider
 from app.experience_rewriter import rewrite_experience
 from app.full_rewrite_validator import validate_full_rewrite
 from app.project_rewriter import rewrite_projects
@@ -13,12 +15,13 @@ def rewrite_resume(
     experience=None,
     projects=None,
     skills=None,
-    client=None,
+    client: LLMProvider | None = None,
 ):
     """Rewrite supported resume sections and validate the result."""
 
     resume_data = resume_data or {}
     tailoring_plan = tailoring_plan or {}
+    client = client or create_llm_provider()
 
     experience_result = rewrite_experience(
         experience=experience or [],
