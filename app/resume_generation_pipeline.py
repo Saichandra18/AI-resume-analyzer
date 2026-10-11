@@ -728,6 +728,129 @@ def _normalize_projects(
                 [],
             )
 
+            # `_normalize_rewritten_collection` may represent a rewritten
+            # project as a description-only dictionary. With flat-string
+            # source projects, treating that description as the title loses
+            # the original project name and leaves no project bullets.
+            # Restore the source title and retain the rewritten description.
+            if (
+                not existing_title
+                and not existing_bullets
+                and isinstance(item.get("description"), str)
+                and item.get("description").strip()
+                and len(original_items) > 1
+                and all(
+                    isinstance(source_item, str)
+                    for source_item in original_items
+                )
+            ):
+                source_title = _normalize_resume_text(
+                    original_items[0]
+                )
+                rewritten_description = _normalize_resume_text(
+                    item["description"]
+                )
+                source_descriptions = [
+                    _normalize_resume_text(source_item)
+                    for source_item in original_items[1:]
+                    if _normalize_resume_text(source_item)
+                ]
+
+                if source_title and rewritten_description:
+                    bullets = [rewritten_description]
+
+                    # If the rewrite is actually just a title-like fragment,
+                    # retain the source description instead of replacing it
+                    # with a fragment that discards the project's substance.
+                    title_tokens = {
+                        token.casefold()
+                        for token in source_title.split()
+                        if len(token) > 2
+                    }
+                    rewritten_tokens = {
+                        token.casefold()
+                        for token in rewritten_description.split()
+                        if len(token) > 2
+                    }
+                    title_overlap = (
+                        len(title_tokens & rewritten_tokens)
+                        / max(len(title_tokens), 1)
+                    )
+                    if (
+                        len(rewritten_description.split()) <= 5
+                        or title_overlap >= 0.75
+                    ):
+                        bullets = source_descriptions or bullets
+                    else:
+                        # Preserve original source wording if the rewrite
+                        # drops it entirely; this protects factual detail and
+                        # important terminology from nondeterministic output.
+                        for source_description in source_descriptions:
+                            source_terms = {
+                                re.sub(r"[^a-z0-9]", "", token.casefold())[:5]
+                                for token in re.findall(
+                                    r"[a-zA-Z0-9]+",
+                                    source_description,
+                                )
+                                if len(token) >= 8
+                            }
+                            rewritten_terms = {
+                                re.sub(r"[^a-z0-9]", "", token.casefold())[:5]
+                                for token in re.findall(
+                                    r"[a-zA-Z0-9]+",
+                                    rewritten_description,
+                                )
+                                if len(token) >= 8
+                            }
+                            if source_terms - rewritten_terms:
+                                bullets.append(source_description)
+
+                    projects.append({
+                        "title": source_title,
+                        "bullets": bullets,
+                    })
+                    continue
+
+            # A rewrite can occasionally return only a project title
+            # (sometimes with a generic suffix such as "platform") and
+            # omit the description entirely. When the source consists of
+            # flat strings and the single rewritten entry clearly starts
+            # with the original first string, retain the source description
+            # instead of silently dropping factual project content.
+            if (
+                not existing_bullets
+                and existing_title
+                and len(value) == 1
+                and len(original_items) > 1
+                and all(
+                    isinstance(source_item, str)
+                    for source_item in original_items
+                )
+            ):
+                source_title = _normalize_resume_text(
+                    original_items[0]
+                )
+                normalized_existing_title = _normalize_resume_text(
+                    existing_title
+                )
+                # Do not require the rewritten title to resemble the source
+                # title. A rewrite may rename the project while accidentally
+                # omitting its description; preserve the original source title
+                # and description rather than silently losing factual content.
+                if source_title:
+                    source_bullets = [
+                        _normalize_resume_text(source_item)
+                        for source_item in original_items[1:]
+                        if _normalize_resume_text(source_item)
+                    ]
+                    if source_bullets:
+                        project = {
+                            "title": source_title,
+                            "bullets": source_bullets,
+                        }
+                        projects.append(project)
+                        continue
+
             if existing_bullets:
                 if not isinstance(
                     existing_bullets,
@@ -802,6 +925,35 @@ def _normalize_projects(
             or original.get("name")
             or ""
         )
+
+        # If the source project is represented as strings rather than
+        # structured dictionaries, recover its title when the rewritten
+        # text starts with that exact title followed by a separator.
+        # This prevents a combined "title - description" rewrite from
+        # becoming one oversized title with no project bullets.
+        if not original_title and len(lines) == 1:
+            rewritten_line = lines[0]
+            for candidate in original_items:
+                if not isinstance(candidate, str):
+                    continue
+
+                candidate = _normalize_resume_text(candidate)
+                if not candidate:
+                    continue
+
+                for separator in (" - ", " – ", " — ", ": "):
+                    prefix = candidate + separator
+                    if rewritten_line.casefold().startswith(
+                        prefix.casefold()
+                    ):
+                        remaining = rewritten_line[len(prefix):].strip()
+                        if remaining:
+                            original_title = candidate
+                            lines = [candidate, remaining]
+                            break
+
+                if original_title:
+                    break
 
         if len(lines) > 1:
             title = lines[0]
