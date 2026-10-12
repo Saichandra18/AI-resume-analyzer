@@ -1,9 +1,10 @@
+
 """Service entry point for RAG-assisted resume optimization."""
 
 from copy import deepcopy
 
 from app.rag.config import RAGConfig
-from app.rag.embeddings.local import LocalEmbeddingProvider
+from app.rag.embeddings.factory import create_embedding_provider
 from app.rag.optimization.knowledge_guidance import (
     KnowledgeGuidanceAdapter,
 )
@@ -90,34 +91,20 @@ class RAGOptimizationService:
         """Initialize missing RAG runtime dependencies."""
 
         if self.embedding_provider is None:
-            dimension = getattr(
-                self.config,
-                "embedding_dimension",
-                384,
-            )
-
-            self.embedding_provider = (
-                LocalEmbeddingProvider(
-                    dimension=dimension
-                )
+            self.embedding_provider = create_embedding_provider(
+                config=self.config
             )
 
         if self.vector_store is None:
-            self.vector_store = (
-                InMemoryVectorStore()
-            )
+            self.vector_store = InMemoryVectorStore()
 
         if self.chunk_registry is None:
             self.chunk_registry = ChunkRegistry()
 
         if self.retrieval_service is None:
-            self.retrieval_service = (
-                RetrievalService(
-                    embedding_provider=(
-                        self.embedding_provider
-                    ),
-                    vector_store=self.vector_store,
-                )
+            self.retrieval_service = RetrievalService(
+                embedding_provider=self.embedding_provider,
+                vector_store=self.vector_store,
             )
 
         if self.retriever is None:
@@ -126,20 +113,14 @@ class RAGOptimizationService:
             )
 
             self.retriever = JDAwareRetriever(
-                retrieval_service=(
-                    self.retrieval_service
-                ),
+                retrieval_service=self.retrieval_service,
                 hydrator=hydrator,
-                resume_context_builder=(
-                    self.resume_context_builder
-                ),
+                resume_context_builder=self.resume_context_builder,
             )
 
         if self.orchestrator is None:
-            self.orchestrator = (
-                RAGOptimizationOrchestrator(
-                    retriever=self.retriever
-                )
+            self.orchestrator = RAGOptimizationOrchestrator(
+                retriever=self.retriever
             )
 
         self._validate_orchestrator(
@@ -189,10 +170,7 @@ class RAGOptimizationService:
             },
         }
 
-    def _retrieve_knowledge_context(
-        self,
-        jd_analysis,
-    ):
+    def _retrieve_knowledge_context(self, jd_analysis):
         """Retrieve and adapt general optimization guidance."""
 
         if self.knowledge_base_service is None:
@@ -203,18 +181,14 @@ class RAGOptimizationService:
             "retrieve",
         ):
             raise TypeError(
-                "knowledge_base_service must "
-                "implement retrieve."
+                "knowledge_base_service must implement retrieve."
             )
 
         results = self.knowledge_base_service.retrieve(
             jd_analysis
         )
 
-        if not isinstance(
-            results,
-            (list, tuple),
-        ):
+        if not isinstance(results, (list, tuple)):
             raise TypeError(
                 "knowledge_base_service.retrieve "
                 "must return a list or tuple."
@@ -243,24 +217,14 @@ class RAGOptimizationService:
             "enabled": True,
             "retrieved_chunks": list(results),
             "count": len(results),
-            "guidance": guidance_context[
-                "guidance"
-            ],
-            "metadata": guidance_context[
-                "metadata"
-            ],
+            "guidance": guidance_context["guidance"],
+            "metadata": guidance_context["metadata"],
         }
 
-    def optimize(
-        self,
-        jd_analysis,
-        resume_data=None,
-    ):
+    def optimize(self, jd_analysis, resume_data=None):
         """Run RAG-assisted optimization when enabled."""
 
-        self._validate_jd_analysis(
-            jd_analysis
-        )
+        self._validate_jd_analysis(jd_analysis)
 
         if not self._is_enabled():
             return {
@@ -270,12 +234,8 @@ class RAGOptimizationService:
                 "recommendations": [],
                 "safety_results": [],
                 "signals": None,
-                "phase11_payload": (
-                    self._empty_phase11_payload()
-                ),
-                "knowledge_context": (
-                    self._empty_knowledge_context()
-                ),
+                "phase11_payload": self._empty_phase11_payload(),
+                "knowledge_context": self._empty_knowledge_context(),
                 "metadata": {
                     "rag_enabled": False,
                     "resume_context_available": (
@@ -303,14 +263,10 @@ class RAGOptimizationService:
             try:
                 result = self.orchestrator.optimize(
                     jd_analysis,
-                    resume_context=(
-                        resume_context
-                    ),
+                    resume_context=resume_context,
                 )
             except TypeError as exc:
-                if "resume_context" not in str(
-                    exc
-                ):
+                if "resume_context" not in str(exc):
                     raise
 
                 result = self.orchestrator.optimize(
@@ -337,19 +293,10 @@ class RAGOptimizationService:
             )
         )
 
-        result["knowledge_context"] = (
-            knowledge_context
-        )
+        result["knowledge_context"] = knowledge_context
 
-        result.setdefault(
-            "enabled",
-            True,
-        )
-
-        result.setdefault(
-            "metadata",
-            {},
-        )
+        result.setdefault("enabled", True)
+        result.setdefault("metadata", {})
 
         result["metadata"].setdefault(
             "rag_enabled",
@@ -376,14 +323,10 @@ class RAGOptimizationService:
 
         self._initialize_runtime()
 
-        from app.rag.indexing.indexer import (
-            KnowledgeIndexer,
-        )
+        from app.rag.indexing.indexer import KnowledgeIndexer
 
         indexer = KnowledgeIndexer(
-            embedding_provider=(
-                self.embedding_provider
-            ),
+            embedding_provider=self.embedding_provider,
             vector_store=self.vector_store,
             chunk_registry=self.chunk_registry,
         )
@@ -407,18 +350,14 @@ class RAGOptimizationService:
     ):
         """Return a defensive copy of the Phase 11 payload."""
 
-        self._validate_jd_analysis(
-            jd_analysis
-        )
+        self._validate_jd_analysis(jd_analysis)
 
         result = self.optimize(
             jd_analysis=jd_analysis,
             resume_data=resume_data,
         )
 
-        payload = result.get(
-            "phase11_payload"
-        )
+        payload = result.get("phase11_payload")
 
         if payload is None:
             raise TypeError(
