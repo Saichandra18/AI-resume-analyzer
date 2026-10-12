@@ -6,6 +6,46 @@ from app.rewrite_models import build_rewrite_output
 from app.rewrite_validator import validate_rewrite
 
 
+def _extract_labeled_summary(resume_text):
+    """Extract an explicitly labeled professional summary from a resume."""
+    if not resume_text or not str(resume_text).strip():
+        return ""
+
+    summary_headings = {
+        "PROFESSIONAL SUMMARY",
+        "PROFESSIONAL PROFILE",
+        "SUMMARY",
+    }
+    section_headings = summary_headings | {
+        "SKILLS", "TECHNICAL SKILLS", "CORE SKILLS",
+        "EXPERIENCE", "WORK EXPERIENCE", "PROFESSIONAL EXPERIENCE",
+        "EMPLOYMENT HISTORY", "EDUCATION", "PROJECTS",
+        "PERSONAL PROJECTS", "CERTIFICATIONS", "CERTIFICATES",
+        "ACHIEVEMENTS", "AWARDS", "PUBLICATIONS", "LANGUAGES",
+        "INTERESTS", "CAREER OBJECTIVE", "OBJECTIVE",
+    }
+
+    summary_lines = []
+    collecting = False
+
+    for line in str(resume_text).splitlines():
+        stripped = line.strip()
+        normalized = stripped.rstrip(":").strip().upper()
+
+        if not collecting:
+            if normalized in summary_headings:
+                collecting = True
+            continue
+
+        if normalized in section_headings:
+            break
+
+        if stripped:
+            summary_lines.append(stripped)
+
+    return " ".join(summary_lines).strip()
+
+
 def rewrite_summary(
     resume_text,
     resume_data=None,
@@ -38,9 +78,16 @@ TARGET JOB DESCRIPTION:
 TASK:
 
 1. Identify the existing professional summary in the resume.
-2. If a professional summary exists, rewrite it.
-3. If no professional summary exists, return an empty result.
-4. Do not create a new summary from information that is not already
+2. Check explicitly for a section headed PROFESSIONAL SUMMARY,
+   PROFESSIONAL PROFILE, or SUMMARY.
+3. If one of these sections exists and contains text, rewrite that text.
+4. Extract the summary from the section rather than guessing whether
+   a summary exists.
+5. Do not return an empty result when this section exists and contains
+   text.
+6. Return an empty result only when no existing professional summary
+   can be identified.
+7. Do not create a new summary from information that is not already
    present in the resume.
 
 RULES:
@@ -100,14 +147,59 @@ Return only JSON-compatible data.
         }
 
     if not parsed_response:
-        return {
-            "summary": {},
-            "validation": {
-                "meaning_preserved": True,
-                "unsupported_claims": [],
-                "grounding_status": "grounded",
-            },
-        }
+        extracted_summary = _extract_labeled_summary(resume_text)
+
+        if extracted_summary:
+            retry_prompt = f"""
+Rewrite the existing professional summary below.
+
+ORIGINAL SUMMARY:
+{extracted_summary}
+
+Requirements:
+- Rewrite only the supplied summary.
+- Preserve the original meaning and every factual claim.
+- Do not invent skills, technologies, experience, achievements, or metrics.
+- Do not exaggerate the candidate's experience.
+- Do not use the job description as evidence of candidate experience.
+- Keep the wording clear, professional, and concise.
+- The original field must contain the supplied original summary.
+- The rewritten field must contain the improved summary.
+- Do not return an empty result when this section exists.
+- Do not return an empty object when the supplied summary is present.
+
+Return only one valid JSON object in this format:
+{{
+  "original": "the original summary text",
+  "rewritten": "the improved summary text",
+  "changes": ["brief description of the change"]
+}}
+"""
+            retry_response = client.generate(retry_prompt)
+
+            try:
+                parsed_response = json.loads(retry_response)
+            except (TypeError, json.JSONDecodeError):
+                parsed_response = {}
+
+            if not isinstance(parsed_response, dict) or not parsed_response:
+                return {
+                    "summary": {},
+                    "validation": {
+                        "meaning_preserved": False,
+                        "unsupported_claims": [],
+                        "grounding_status": "needs_review",
+                    },
+                }
+        else:
+            return {
+                "summary": {},
+                "validation": {
+                    "meaning_preserved": True,
+                    "unsupported_claims": [],
+                    "grounding_status": "grounded",
+                },
+            }
 
     original = parsed_response.get("original", "")
     rewritten = parsed_response.get("rewritten", "")
