@@ -84,3 +84,22 @@ def test_get_llm_config_preserves_openai_environment_compatibility(monkeypatch):
     assert config.model == "legacy-model"
     assert config.api_key == "legacy-key"
     assert config.base_url is None
+
+def test_get_llm_config_does_not_inherit_openai_key_for_local_provider(
+    monkeypatch,
+):
+    monkeypatch.setenv("LLM_PROVIDER", "local")
+    monkeypatch.setenv("LLM_MODEL", "local-model")
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+
+    # Simulate an OpenAI key still being present in the environment.
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "legacy-openai-key",
+    )
+
+    config = get_llm_config()
+
+    assert config.provider is LLMProviderType.LOCAL
+    assert config.model == "local-model"
+    assert config.api_key is None
