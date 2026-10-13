@@ -212,3 +212,47 @@ def test_shared_registry_contains_local_provider():
     registry = get_embedding_provider_registry()
 
     assert registry.get("local") is LocalEmbeddingProvider
+
+
+def test_factory_passes_configured_model_to_custom_provider(
+    monkeypatch,
+):
+    """Custom providers receive the configured model and dimension."""
+
+    class ModelAwareEmbeddingProvider(EmbeddingProvider):
+        def __init__(self, model="default", dimension=16):
+            self.model = model
+            self.dimension = dimension
+
+        def generate_embedding(self, text):
+            return [0.0] * self.dimension
+
+        def generate_embeddings(self, texts):
+            return [
+                self.generate_embedding(text)
+                for text in texts
+            ]
+
+    registry = get_embedding_provider_registry()
+    provider_name = "phase24_model_aware_test"
+
+    if registry.get(provider_name) is None:
+        registry.register_factory(
+            provider_name,
+            ModelAwareEmbeddingProvider,
+            lambda **kwargs: ModelAwareEmbeddingProvider(
+                model=kwargs.get("model", "default"),
+                dimension=kwargs.get("dimension", 16),
+            ),
+        )
+
+    class CustomConfig:
+        embedding_provider = provider_name
+        embedding_model = "test-embedding-model"
+        embedding_dimension = 48
+
+    provider = create_embedding_provider(CustomConfig())
+
+    assert isinstance(provider, ModelAwareEmbeddingProvider)
+    assert provider.model == "test-embedding-model"
+    assert provider.dimension == 48

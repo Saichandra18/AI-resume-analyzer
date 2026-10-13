@@ -127,3 +127,26 @@ def test_boolean_configuration_is_case_insensitive(
     config = RAGConfig()
 
     assert config.enabled is True
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "maybe",
+        "treu",
+        "",
+        "enabled",
+        "2",
+    ],
+)
+def test_invalid_rag_enabled_value_raises_error(
+    monkeypatch,
+    value,
+):
+    monkeypatch.setenv("RAG_ENABLED", value)
+
+    with pytest.raises(
+        ValueError,
+        match="RAG_ENABLED must be a boolean value",
+    ):
+        RAGConfig()

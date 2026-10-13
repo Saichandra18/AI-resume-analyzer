@@ -34,15 +34,23 @@ class RAGConfig:
 
     @staticmethod
     def _get_bool(name, default):
-        """Read a boolean environment variable."""
+        """Read a boolean environment variable strictly."""
         value = os.getenv(name)
 
         if value is None:
             return default
 
-        return value.strip().lower() in {
-            "1", "true", "yes", "on"
-        }
+        normalized = value.strip().lower()
+
+        if normalized in {"1", "true", "yes", "on"}:
+            return True
+
+        if normalized in {"0", "false", "no", "off"}:
+            return False
+
+        raise ValueError(
+            f"{name} must be a boolean value."
+        )
 
     @staticmethod
     def _get_positive_int(name, default):
