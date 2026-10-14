@@ -2,7 +2,7 @@
 
 from copy import deepcopy
 
-from app.rag.embeddings.local import LocalEmbeddingProvider
+from app.rag.embeddings.factory import create_embedding_provider
 from app.rag.indexing import (
     KnowledgeIndexer,
     KnowledgeIndexingPipeline,
@@ -30,9 +30,7 @@ class KnowledgeBaseService:
         retriever=None,
         top_k=5,
     ):
-        self.embedding_provider = (
-            embedding_provider
-        )
+        self.embedding_provider = embedding_provider
         self.vector_store = vector_store
         self.chunk_registry = chunk_registry
         self.retrieval_service = retrieval_service
@@ -48,9 +46,7 @@ class KnowledgeBaseService:
         """Initialize missing knowledge-base dependencies."""
 
         if self.embedding_provider is None:
-            self.embedding_provider = (
-                LocalEmbeddingProvider()
-            )
+            self.embedding_provider = create_embedding_provider()
 
         if self.chunk_registry is None:
             self.chunk_registry = ChunkRegistry()
@@ -69,9 +65,7 @@ class KnowledgeBaseService:
             )
 
         if self.catalog is None:
-            self.catalog = (
-                DefaultKnowledgeCatalog().build()
-            )
+            self.catalog = DefaultKnowledgeCatalog().build()
 
         if self.indexing_pipeline is None:
             indexer = KnowledgeIndexer(
@@ -80,10 +74,8 @@ class KnowledgeBaseService:
                 chunk_registry=self.chunk_registry,
             )
 
-            self.indexing_pipeline = (
-                KnowledgeIndexingPipeline(
-                    indexer=indexer
-                )
+            self.indexing_pipeline = KnowledgeIndexingPipeline(
+                indexer=indexer
             )
 
         if self.persistence is None:
@@ -106,51 +98,38 @@ class KnowledgeBaseService:
 
     def index_all(self):
         """Index all approved knowledge sources."""
-
         return self.manager.index_all()
 
     def index_source(self, source_id):
         """Index one approved knowledge source."""
-
-        return self.manager.index_source(
-            source_id
-        )
+        return self.manager.index_source(source_id)
 
     def retrieve(self, jd_analysis):
         """Retrieve general knowledge relevant to a JD."""
-
-        return self.retriever.retrieve(
-            jd_analysis
-        )
+        return self.retriever.retrieve(jd_analysis)
 
     def save(self, file_path):
         """Persist the current knowledge index."""
-
         return self.manager.save(file_path)
 
     def load(self, file_path):
         """Load a persisted knowledge index."""
-
         return self.manager.load(file_path)
 
     def indexed_count(self):
         """Return the number of indexed knowledge records."""
-
         return self.manager.indexed_count()
 
     def source_status(self):
         """Return status information for approved sources."""
-
         return self.manager.source_status()
 
     def is_indexed(self):
         """Return whether the knowledge base contains records."""
-
         return self.indexed_count() > 0
 
     def retrieve_with_metadata(self, jd_analysis):
         """Retrieve knowledge and attach service-level metadata."""
-
         results = self.retrieve(jd_analysis)
 
         return {

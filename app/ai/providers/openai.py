@@ -14,7 +14,7 @@ class OpenAIProvider(LLMProvider):
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         self.model = model or os.getenv("OPENAI_MODEL", "gpt-5.6-luna")
 
-        if not self.api_key:
+        if not self.api_key or not str(self.api_key).strip():
             raise ValueError("OPENAI_API_KEY is not configured.")
 
         self.client = OpenAI(api_key=self.api_key)

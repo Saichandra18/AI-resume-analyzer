@@ -66,7 +66,7 @@ def test_rewrite_summary_sends_tailoring_plan():
         "summary": [
             {
                 "item": "Python",
-                "recommendation": "Strengthen Python positioning."
+                "recommendation": "Strengthen Python positioning.",
             }
         ]
     }
@@ -151,6 +151,7 @@ def test_rewrite_summary_validates_rewrite():
     )
     assert result["validation"]["grounding_status"] == "needs_review"
 
+
 def test_rewrite_summary_does_not_allow_unsupported_claim_strengthening():
     class JSONClient:
         def generate(self, prompt):
@@ -174,3 +175,87 @@ def test_rewrite_summary_does_not_allow_unsupported_claim_strengthening():
         "Unsupported claim strengthening detected: delivered" in claim
         for claim in validation["unsupported_claims"]
     )
+
+
+def test_rewrite_summary_prompt_protects_explicit_summary_section():
+    class CapturingClient:
+        def __init__(self):
+            self.prompt = ""
+
+        def generate(self, prompt):
+            self.prompt = prompt
+            return "{}"
+
+    resume_text = """
+    PROFESSIONAL SUMMARY
+    Entry-level Python developer with experience building Flask APIs
+    and SQL data analysis projects.
+
+    SKILLS
+    Python, SQL, Flask
+    """
+
+    client = CapturingClient()
+
+    rewrite_summary(
+        resume_text=resume_text,
+        client=client,
+    )
+
+    prompt = client.prompt.lower()
+
+    assert "professional summary" in prompt
+    assert (
+        "do not return an empty result when this section exists" in prompt
+    )
+
+def test_rewrite_summary_retries_with_explicit_section_when_model_returns_empty():
+    class RetryClient:
+        def __init__(self):
+            self.prompts = []
+            self.calls = 0
+
+        def generate(self, prompt):
+            import json
+
+            self.prompts.append(prompt)
+            self.calls += 1
+
+            if self.calls == 1:
+                return "{}"
+
+            return json.dumps(
+                {
+                    "original": (
+                        "Entry-level Python developer with experience "
+                        "building Flask APIs and SQL data analysis projects."
+                    ),
+                    "rewritten": (
+                        "Entry-level Python developer experienced in "
+                        "building Flask APIs and conducting SQL data analysis."
+                    ),
+                    "changes": [
+                        "Improved clarity while preserving the original facts."
+                    ],
+                }
+            )
+
+    resume_text = """
+    PROFESSIONAL SUMMARY
+    Entry-level Python developer with experience building Flask APIs
+    and SQL data analysis projects.
+
+    SKILLS
+    Python, SQL, Flask
+    """
+
+    client = RetryClient()
+
+    result = rewrite_summary(
+        resume_text=resume_text,
+        client=client,
+    )
+
+    assert client.calls == 2
+    assert result["summary"]["rewritten"]
+    assert result["summary"]["original"].startswith("Entry-level")

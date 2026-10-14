@@ -4,9 +4,9 @@ An AI-powered web application that analyzes resumes against job descriptions, pr
 
 ## Current Status
 
-**Phase 18 — Production Readiness & Deployment**
+**Phase 24 — Provider Testing, Configuration, Documentation & Regression (Validated)**
 
-Completed and validated:
+Completed capabilities include:
 
 - Resume parsing and structuring
 - Job description analysis
@@ -23,12 +23,10 @@ Completed and validated:
 - End-to-end testing
 - Production security hardening
 - Production WSGI deployment with Waitress
+- LLM provider abstraction and runtime switching
+- OpenAI-compatible, local, and Anthropic provider support
+- Embedding provider abstraction
 
-Latest full regression baseline:
-
-**1956 tests passed, 0 failed**
-
----
 
 ## Features
 
@@ -62,25 +60,21 @@ The ATS scoring engine evaluates resume compatibility using:
 - Qualifications
 - Keywords
 
-The current scoring configuration uses:
+Current scoring weights:
 
-- Skills: 50%
-- Experience: 20%
-- Qualifications: 15%
-- Keywords: 15%
+| Category | Weight |
+|---|---:|
+| Skills | 50% |
+| Experience | 20% |
+| Qualifications | 15% |
+| Keywords | 15% |
+| **Total** | **100%** |
 
-The analyzer also identifies:
-
-- Matching skills
-- Missing skills
-- Matching keywords
-- Resume strengths
-- Resume weaknesses
-- Improvement opportunities
+The analyzer also identifies matching skills, missing skills, matching keywords, resume strengths, resume weaknesses, and improvement opportunities.
 
 ### Resume Improvement
 
-The application can generate recommendations based on ATS gaps, including:
+Recommendations can address:
 
 - Missing skills
 - Missing keywords
@@ -100,9 +94,7 @@ The application supports AI-assisted rewriting of:
 
 The rewriting pipeline validates generated content before incorporating it into the final resume.
 
-### JD-Optimized Resume Generation
-
-The application can generate a resume optimized for a target job description.
+### Job-Description-Optimized Resume Generation
 
 The generation pipeline includes:
 
@@ -120,20 +112,18 @@ The generation pipeline includes:
 12. Final validation
 13. DOCX/PDF rendering
 
-### RAG
+## Retrieval-Augmented Generation (RAG)
 
-The application includes Retrieval-Augmented Generation support for knowledge-grounded resume optimization.
+The application includes RAG support for knowledge-grounded resume optimization.
 
 RAG components include:
 
-- Document loading
-- Document parsing
-- Document cleaning
-- Document chunking
+- Document loading and parsing
+- Document cleaning and chunking
 - Embedding support
 - In-memory vector storage
 - Retrieval services
-- JD-aware retrieval
+- Job-description-aware retrieval
 - Resume-aware retrieval
 - Knowledge-base persistence
 - Grounding validation
@@ -141,7 +131,11 @@ RAG components include:
 
 RAG can be enabled or disabled through configuration.
 
-### Professional Resume Templates
+The built-in local embedding provider generates deterministic SHA-256-based vectors. It does not call an external embedding API. Changing `RAG_EMBEDDING_MODEL` does not change the local embedding algorithm.
+
+Only the local embedding provider is registered by default. Other embedding providers must be registered and implemented separately.
+
+## Professional Resume Templates
 
 Supported functionality includes:
 
@@ -157,7 +151,7 @@ Supported functionality includes:
 - Template selection
 - Visual validation
 
-### Web Application
+## Web Application
 
 The Flask application provides:
 
@@ -168,16 +162,14 @@ The Flask application provides:
 - Optimized resume generation
 - Resume download
 - Validation results
-- Generation progress/state
+- Generation progress and state
 - Template selection
 - Error handling
 - Responsive UI
 
----
+## Technology Stack
 
-# Technology Stack
-
-## Backend
+### Backend
 
 - Python
 - Flask
@@ -187,38 +179,36 @@ The Flask application provides:
 - ReportLab
 - Pillow
 
-## AI / NLP
+### AI and NLP
 
 - LLM-based resume rewriting
 - ATS matching
-- RAG
+- Retrieval-Augmented Generation
 - Embeddings
 - Knowledge retrieval
+- Multiple LLM provider support
 
-## Frontend
+### Frontend
 
 - HTML
 - CSS
 - JavaScript
 
-## Testing
+### Testing
 
 - pytest
 
-## Configuration
+### Configuration
 
 - python-dotenv
 - Environment variables
 
----
+## Project Structure
 
-# Project Structure
-
-A simplified project structure:
+Simplified project structure:
 
 ```text
 AI Resume Analyzer/
-│
 ├── app/
 │   ├── ai/
 │   ├── rag/
@@ -226,15 +216,12 @@ AI Resume Analyzer/
 │   ├── templates/
 │   ├── static/
 │   └── ...
-│
 ├── data/
 ├── frontend/
 ├── generated_rag/
 ├── generated_resumes/
 ├── tests/
 ├── uploads/
-│
-├── .env
 ├── .env.example
 ├── .gitignore
 ├── app.py
@@ -245,11 +232,9 @@ AI Resume Analyzer/
 └── README.md
 ```
 
-Generated files and user uploads are excluded from version control through `.gitignore`.
+Generated files and user uploads should be excluded from version control through `.gitignore`.
 
----
-
-# Prerequisites
+## Prerequisites
 
 Recommended environment:
 
@@ -257,30 +242,28 @@ Recommended environment:
 - pip
 - Git
 
-An OpenAI API key is required only for functionality that uses the configured OpenAI provider.
+An OpenAI API key is required only for functionality that uses the configured OpenAI provider. Other providers have their own configuration requirements.
 
-Do not commit API keys or other secrets to source control.
+Never commit API keys or other secrets to source control.
 
----
+## Installation
 
-# Installation
+### 1. Clone the repository
 
-## 1. Clone the repository
-
-```bash
+```powershell
 git clone <repository-url>
 cd "AI Resume Analyzer"
 ```
 
-## 2. Create a virtual environment
+Replace `<repository-url>` with your repository URL.
 
-Windows PowerShell:
+### 2. Create a virtual environment
 
 ```powershell
 python -m venv venv
 ```
 
-Activate it:
+Activate it in Windows PowerShell:
 
 ```powershell
 .\venv\Scripts\Activate.ps1
@@ -288,67 +271,15 @@ Activate it:
 
 If PowerShell execution policy prevents activation, use the appropriate environment activation method for your system.
 
-## 3. Install dependencies
+### 3. Install dependencies
 
 ```powershell
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
+## Running in Development
 
----
-
-# Environment Configuration
-
-Create a `.env` file in the project root.
-
-Example:
-
-```text
-OPENAI_API_KEY=
-OPENAI_MODEL=gpt-5.6-luna
-
-SECRET_KEY=
-
-FLASK_ENV=development
-
-RAG_ENABLED=false
-RAG_EMBEDDING_PROVIDER=local
-RAG_EMBEDDING_MODEL=default
-RAG_EMBEDDING_DIMENSION=384
-
-# Optional
-# RAG_KNOWLEDGE_INDEX_PATH=
-
-FLASK_DEBUG=false
-```
-
-The repository contains `.env.example` as a configuration template.
-
-## Production Requirements
-
-When:
-
-```text
-FLASK_ENV=production
-```
-
-a `SECRET_KEY` must be supplied.
-
-The application intentionally refuses to start if production mode is enabled without a secret key.
-
-For production:
-
-```text
-FLASK_DEBUG=false
-```
-
-Never commit the real `.env` file or API credentials.
-
----
-
-# Running in Development
-
-For local development, start the Flask application using the project's development entry point:
+Start the Flask application using the development entry point:
 
 ```powershell
 python run.py
@@ -356,153 +287,125 @@ python run.py
 
 Use the development server only for local development.
 
----
+## Running in Production
 
-# Running in Production
+The project provides a WSGI entry point in `wsgi.py`, which exposes the application through `create_app()`.
 
-The project provides a WSGI entry point:
-
-```text
-wsgi.py
-```
-
-It exposes:
-
-```python
-app = create_app()
-```
-
-The production server uses Waitress.
-
-Start the application with:
+Start the application using Waitress:
 
 ```powershell
 python -m waitress --listen=127.0.0.1:5000 --max-request-body-size=5242880 wsgi:app
 ```
 
-The application will be available at:
+The application will be available at `http://127.0.0.1:5000`. The configured request body limit is 5 MB.
 
-```text
-http://127.0.0.1:5000
+For a real deployment, configure network binding for the hosting environment and use an appropriate network security layer or reverse proxy where required.
+
+## API Endpoints
+
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/` | GET | Serves the web application |
+| `/api/resume/upload` | POST | Uploads and processes a resume |
+| `/api/job-description` | POST | Analyzes a job description |
+| `/api/analyze` | POST | Analyzes resume compatibility |
+| `/api/resume/rewrite` | POST | Performs AI-assisted resume rewriting |
+| `/api/resume/generate` | POST | Generates an optimized resume in DOCX and PDF formats |
+| `/api/resume/download` | GET | Downloads a generated document using the `filename` query parameter |
+
+Request formats, validation requirements, and response details are defined by the corresponding Flask route handlers.
+
+## Environment Configuration
+
+Create a `.env` file in the project root. Use `.env.example` as the configuration template.
+
+Do not commit `.env` or real credentials.
+
+### Production Requirements
+
+- Configure the application using the project's supported production configuration.
+- Set a strong, randomly generated `SECRET_KEY`.
+- Keep `FLASK_DEBUG=false` in production.
+- Never commit `.env` or real API credentials.
+
+The application must be configured according to its production startup requirements before deployment.
+
+### LLM Provider Configuration
+
+Configure the LLM provider through environment variables:
+
+```dotenv
+LLM_PROVIDER=openai
+LLM_MODEL=
+LLM_API_KEY=
+LLM_BASE_URL=
 ```
 
-The configured request body limit is 5 MB.
+Built-in provider identifiers:
 
-For a real deployment, bind the server according to the hosting environment and place the application behind the appropriate network security layer/reverse proxy when required.
+| Provider | `LLM_PROVIDER` value | Configuration requirements |
+|---|---|---|
+| OpenAI | `openai` | API key and model |
+| OpenAI-compatible API | `openai_compatible` | API key, model, and base URL |
+| Local LLM server | `local` | Model and base URL; API key is optional |
+| Anthropic | `anthropic` | API key and model |
 
----
+Registered custom providers can also be selected through the provider registry, provided their constructors and configuration requirements are satisfied.
 
-# API Endpoints
+### Legacy OpenAI Configuration
 
-## Home
+The application retains compatibility with these environment variables:
 
-```text
-GET /
+```dotenv
+OPENAI_API_KEY=
+OPENAI_MODEL=
 ```
 
-Returns the web application.
+When `LLM_PROVIDER` is unset, the default provider is `openai`.
 
-## Resume Upload
+The legacy `OPENAI_API_KEY` and `OPENAI_MODEL` values are used as fallbacks when the corresponding generic `LLM_API_KEY` and `LLM_MODEL` values are absent or empty.
 
-```text
-POST /api/resume/upload
-```
+`LLM_BASE_URL` is used for providers that require a custom endpoint.
 
-Uploads and processes a supported resume document.
+Keep API keys secret and never commit credentials to source control.
 
-## Job Description
-
-```text
-POST /api/job-description
-```
-
-Analyzes a submitted job description.
-
-## ATS Analysis
-
-```text
-POST /api/analyze
-```
-
-Analyzes resume compatibility against a job description.
-
-## Resume Rewrite
-
-```text
-POST /api/resume/rewrite
-```
-
-Generates supported AI-assisted resume content.
-
-## Resume Generation
-
-```text
-POST /api/resume/generate
-```
-
-Generates a job-description-optimized resume.
-
-## Resume Download
-
-```text
-GET /api/resume/download
-```
-
-Downloads the generated resume.
-
----
-
-# ATS Scoring
-
-The ATS score currently uses the following weighting:
-
-| Category | Weight |
-|---|---:|
-| Skills | 50% |
-| Experience | 20% |
-| Qualifications | 15% |
-| Keywords | 15% |
-| **Total** | **100%** |
-
-The score is accompanied by detailed matching information rather than being treated as a standalone hiring decision.
-
----
-
-# RAG Configuration
-
-RAG is controlled through environment variables.
+### RAG Configuration
 
 Enable RAG:
 
-```text
+```dotenv
 RAG_ENABLED=true
 ```
 
 Disable RAG:
 
-```text
+```dotenv
 RAG_ENABLED=false
 ```
 
 Embedding configuration:
 
-```text
+```dotenv
 RAG_EMBEDDING_PROVIDER=local
 RAG_EMBEDDING_MODEL=default
 RAG_EMBEDDING_DIMENSION=384
 ```
 
+Boolean values for `RAG_ENABLED` must use a supported true value (`1`, `true`, `yes`, `on`) or false value (`0`, `false`, `no`, `off`). Invalid values raise a configuration error.
+
+The local embedding provider uses deterministic SHA-256-based vectors. The model setting is forwarded to registered providers that implement model selection, but it does not change the local provider's algorithm.
+
+Only the local embedding provider is registered by default.
+
 Optional persisted knowledge index:
 
-```text
+```dotenv
 RAG_KNOWLEDGE_INDEX_PATH=
 ```
 
 RAG functionality is designed to remain compatible with RAG disabled.
 
----
-
-# Security
+## Security
 
 Production hardening includes:
 
@@ -531,9 +434,7 @@ Permissions-Policy: camera=(), microphone=(), geolocation=()
 
 Unexpected server exceptions are logged while preventing internal traceback details from being exposed to clients.
 
----
-
-# Testing
+## Testing
 
 The project uses pytest.
 
@@ -557,67 +458,43 @@ python -m pytest tests -k "rag" -v
 
 ## Production Validation
 
-The project has undergone extensive regression, integration, UI, RAG, ATS, template, security, and end-to-end testing.
+The project has undergone regression, integration, UI, RAG, ATS, template, security, and end-to-end testing.
 
-Latest full regression baseline:
+- Historical Phase 23 regression baseline: **2,168 passed, 0 failed**
+- Phase 24 full regression: **2,174 passed, 0 failed**
 
-```text
-1956 passed, 0 failed
+The reported Phase 24 regression validated the application and test changes. The final README-only updates are documentation changes and do not alter application behavior.
 
+## Production Smoke Testing
 
-Latest production smoke-test validation:
-
-6 passed, 0 failed
-
-The production smoke-test suite validates production configuration,
-secret-key enforcement, application creation, root endpoint availability,
-API validation, and traceback protection.
-```
-
----
-
-# Production Smoke Testing
-
-When Waitress is running:
+Start Waitress using:
 
 ```powershell
 python -m waitress --listen=127.0.0.1:5000 --max-request-body-size=5242880 wsgi:app
 ```
 
-Verify the application:
+Verify the application in another PowerShell window:
 
 ```powershell
-Invoke-WebRequest `
-    http://127.0.0.1:5000/ `
-    -UseBasicParsing |
-    Select-Object StatusCode
+(Invoke-WebRequest http://127.0.0.1:5000/ -UseBasicParsing).StatusCode
 ```
 
-Expected:
+Expected status code:
 
 ```text
 200
 ```
 
-Invalid API requests should return appropriate validation responses such as:
+Invalid API requests should return appropriate validation responses, such as `400`, depending on the endpoint and request.
 
-```text
-400
-```
-
-Security headers can be inspected with:
+Inspect security headers:
 
 ```powershell
-$response = Invoke-WebRequest `
-    http://127.0.0.1:5000/ `
-    -UseBasicParsing
-
+$response = Invoke-WebRequest http://127.0.0.1:5000/ -UseBasicParsing
 $response.Headers
 ```
 
----
-
-# Deployment Checklist
+## Deployment Checklist
 
 Before deploying:
 
@@ -625,7 +502,7 @@ Before deploying:
 - [ ] Configure production environment variables
 - [ ] Set a strong production `SECRET_KEY`
 - [ ] Configure the required LLM provider credentials
-- [ ] Set `FLASK_ENV=production`
+- [ ] Set the appropriate production Flask configuration
 - [ ] Set `FLASK_DEBUG=false`
 - [ ] Verify RAG configuration
 - [ ] Confirm generated files are not committed
@@ -640,45 +517,43 @@ Before deploying:
 - [ ] Verify document download
 - [ ] Review application logs
 
----
+## Important Production Notes
 
-# Important Production Notes
-
-## API Credentials
+### API Credentials
 
 Never place API credentials directly in Python source code.
 
 Use environment variables:
 
-```text
+```dotenv
 OPENAI_API_KEY=
 ```
 
 If an API credential is accidentally exposed, revoke or rotate it immediately.
 
-## Debug Mode
+### Debug Mode
 
 Never enable Flask debug mode in production:
 
-```text
+```dotenv
 FLASK_DEBUG=false
 ```
 
-## Secret Key
+### Secret Key
 
-Production requires:
+Production requires a strong, randomly generated secret key:
 
-```text
+```dotenv
 SECRET_KEY=<strong-random-secret>
 ```
 
 Do not use the development fallback secret in production.
 
-## Uploaded Files
+### Uploaded Files
 
 Uploaded resumes contain potentially sensitive user information.
 
-Production deployments should therefore use appropriate:
+Production deployments should implement appropriate:
 
 - Access controls
 - File retention policies
@@ -686,67 +561,63 @@ Production deployments should therefore use appropriate:
 - Logging policies
 - Data protection practices
 
----
-
-# Application Workflow
+## Application Workflow
 
 The overall workflow is:
 
 ```text
 Resume
-   │
-   ▼
+  |
+  v
 Resume Parsing
-   │
-   ▼
+  |
+  v
 Resume Structuring
-   │
-   ▼
+  |
+  v
 Job Description Analysis
-   │
-   ▼
+  |
+  v
 ATS Matching
-   │
-   ├──► Strengths
-   ├──► Weaknesses
-   ├──► Missing Skills
-   └──► Missing Keywords
-            │
-            ▼
-     Tailoring Plan
-            │
-            ▼
-      AI Rewriting
-            │
-            ▼
-     Content Selection
-            │
-            ▼
-     Content Prioritization
-            │
-            ▼
-       Length Control
-            │
-            ▼
-      Section Ordering
-            │
-            ▼
-      Final Validation
-            │
-            ▼
-    Template Rendering
-            │
-            ▼
-       DOCX / PDF
+  |
+  +----> Strengths
+  +----> Weaknesses
+  +----> Missing Skills
+  +----> Missing Keywords
+  |
+  v
+Tailoring Plan
+  |
+  v
+AI Rewriting
+  |
+  v
+Content Selection
+  |
+  v
+Content Prioritization
+  |
+  v
+Length Control
+  |
+  v
+Section Ordering
+  |
+  v
+Final Validation
+  |
+  v
+Template Rendering
+  |
+  v
+DOCX / PDF
 ```
 
 When RAG is enabled, knowledge retrieval and grounding can be incorporated into the optimization workflow.
 
----
+## Project Validation Milestones
 
-# Project Validation Milestones
-
-The project has progressed through multiple development phases covering:
+The project has progressed through development phases covering:
 
 - Foundation and Flask architecture
 - Resume parsing
@@ -765,18 +636,17 @@ The project has progressed through multiple development phases covering:
 - End-to-end testing
 - Production hardening
 - Deployment validation
+- LLM provider expansion
+- Embedding provider abstraction
+- Provider configuration and documentation
 
-The current development effort is focused on completing production-readiness and deployment documentation.
+Phase 24 completed provider configuration hardening, embedding-provider validation, documentation updates, and full regression testing.
 
----
-
-# License
+## License
 
 Add the project's applicable license here before public distribution.
 
----
-
-# Disclaimer
+## Disclaimer
 
 The ATS score and recommendations are automated analysis tools intended to assist with resume improvement.
 

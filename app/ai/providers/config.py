@@ -1,4 +1,5 @@
 import os
+from dataclasses import dataclass
 
 from dotenv import load_dotenv
 
@@ -8,29 +9,44 @@ from .models import LLMConfig, LLMProviderType
 load_dotenv()
 
 
-def get_llm_config() -> LLMConfig:
-    """
-    Load the active LLM configuration from environment variables.
+@dataclass(frozen=True)
+class _RuntimeLLMConfig:
+    """Runtime configuration for a registered custom provider."""
 
-    Environment variables:
-        LLM_PROVIDER: Provider type. Defaults to ``openai``.
-        LLM_MODEL: Model name. Falls back to OPENAI_MODEL.
-        LLM_API_KEY: Generic provider API key.
-        LLM_BASE_URL: Optional provider base URL.
+    provider: str
+    model: str
+    api_key: str | None = None
+    base_url: str | None = None
 
-    Backward compatibility:
-        OPENAI_API_KEY and OPENAI_MODEL remain supported so the
-        existing OpenAI setup does not need to change yet.
-    """
+    def __post_init__(self):
+        if not isinstance(self.model, str) or not self.model.strip():
+            raise ValueError("Model must not be empty.")
 
-    provider_value = os.getenv("LLM_PROVIDER", "openai").strip().lower()
+        if not isinstance(self.provider, str) or not self.provider.strip():
+            raise ValueError("Provider must not be empty.")
+
+
+def get_llm_config() -> LLMConfig | _RuntimeLLMConfig:
+    """Load configuration for a built-in or registered custom provider."""
+
+    provider_value = (
+        os.getenv("LLM_PROVIDER", "openai").strip().lower()
+    )
 
     try:
         provider = LLMProviderType(provider_value)
-    except ValueError as exc:
-        raise ValueError(
-            f"Unsupported LLM provider: {provider_value}"
-        ) from exc
+    except ValueError:
+        # Import lazily to avoid a circular import during module loading.
+        from app.ai.factory import get_provider_registry
+
+        registry = get_provider_registry()
+
+        if registry.get(provider_value) is None:
+            raise ValueError(
+                f"Unsupported LLM provider: {provider_value}"
+            )
+
+        provider = provider_value
 
     model = (
         os.getenv("LLM_MODEL")
@@ -38,14 +54,23 @@ def get_llm_config() -> LLMConfig:
         or ""
     ).strip()
 
-    api_key = (
-        os.getenv("LLM_API_KEY")
-        or os.getenv("OPENAI_API_KEY")
-    )
+    if os.getenv("LLM_API_KEY"):
+        api_key = os.getenv("LLM_API_KEY")
+    elif provider == LLMProviderType.OPENAI:
+        api_key = os.getenv("OPENAI_API_KEY")
+    else:
+        api_key = None
 
     base_url = os.getenv("LLM_BASE_URL")
 
-    return LLMConfig(
+    config_class = (
+        _RuntimeLLMConfig
+        if isinstance(provider, str)
+        and not isinstance(provider, LLMProviderType)
+        else LLMConfig
+    )
+
+    return config_class(
         provider=provider,
         model=model,
         api_key=api_key,

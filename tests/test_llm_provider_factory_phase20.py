@@ -1,7 +1,12 @@
 import pytest
 
 from app.ai.factory import create_llm_provider
-from app.ai.providers import LLMProvider, OpenAIProvider
+from app.ai.providers import (
+    LLMProvider,
+    LocalProvider,
+    OpenAICompatibleProvider,
+    OpenAIProvider,
+)
 
 
 def test_factory_creates_openai_provider(monkeypatch):
@@ -32,19 +37,86 @@ def test_factory_supports_legacy_openai_environment(monkeypatch):
     assert provider.api_key == "legacy-key"
 
 
+def test_factory_creates_openai_compatible_provider(
+    monkeypatch,
+):
+    monkeypatch.setenv(
+        "LLM_PROVIDER",
+        "openai_compatible",
+    )
+    monkeypatch.setenv(
+        "LLM_MODEL",
+        "compatible-model",
+    )
+    monkeypatch.setenv(
+        "LLM_API_KEY",
+        "compatible-key",
+    )
+    monkeypatch.setenv(
+        "LLM_BASE_URL",
+        "http://localhost:1234/v1",
+    )
+
+    provider = create_llm_provider()
+
+    assert isinstance(
+        provider,
+        OpenAICompatibleProvider,
+    )
+    assert isinstance(provider, LLMProvider)
+    assert provider.model == "compatible-model"
+    assert provider.api_key == "compatible-key"
+    assert provider.base_url == "http://localhost:1234/v1"
+
+
+def test_factory_creates_local_provider(
+    monkeypatch,
+):
+    monkeypatch.setenv(
+        "LLM_PROVIDER",
+        "local",
+    )
+    monkeypatch.setenv(
+        "LLM_MODEL",
+        "local-model",
+    )
+    monkeypatch.setenv(
+        "LLM_BASE_URL",
+        "http://localhost:11434/v1",
+    )
+    monkeypatch.delenv(
+        "LLM_API_KEY",
+        raising=False,
+    )
+
+    provider = create_llm_provider()
+
+    assert isinstance(provider, LocalProvider)
+    assert isinstance(provider, LLMProvider)
+    assert provider.model == "local-model"
+    assert provider.base_url == "http://localhost:11434/v1"
+    assert provider.api_key is None
+
+
 @pytest.mark.parametrize(
     "provider_name",
     [
-        "openai_compatible",
-        "local",
+        "unsupported",
+        "gemini",
     ],
 )
-def test_factory_rejects_unimplemented_providers(
+def test_factory_rejects_unknown_providers(
     monkeypatch,
     provider_name,
 ):
-    monkeypatch.setenv("LLM_PROVIDER", provider_name)
-    monkeypatch.setenv("LLM_MODEL", "test-model")
+    monkeypatch.setenv(
+        "LLM_PROVIDER",
+        provider_name,
+    )
+    monkeypatch.setenv(
+        "LLM_MODEL",
+        "test-model",
+    )
 
     with pytest.raises(
         ValueError,
