@@ -3,6 +3,7 @@
 from copy import deepcopy
 import re
 
+from app.name_extractor import extract_name
 from app.final_resume_models import build_final_resume
 from app.final_resume_validator import validate_final_resume
 from app.resume_content_prioritizer import prioritize_content
@@ -2178,13 +2179,25 @@ def generate_optimized_resume(
         allow_single_token_keywords=rag_service is not None,
     )
 
-    final_resume = build_final_resume(
-        personal_info=resume_data.get(
-            "personal_info",
-            {},
-        ),
-        summary=optimized_summary,
+   
+    # Recover the candidate's name if structured data is missing it.
+    personal_info = resume_data.get("personal_info")
 
+    if not isinstance(personal_info, dict):
+        personal_info = {}
+
+    personal_info = deepcopy(personal_info)
+
+    if not str(personal_info.get("name") or "").strip():
+        extracted_name = extract_name(resume_text)
+
+        if extracted_name:
+            personal_info["name"] = extracted_name
+
+    # Build the canonical final resume.
+    final_resume = build_final_resume(
+        personal_info=personal_info,
+        summary=optimized_summary,
         skills=selected_sections.get(
             "skills",
             [],
@@ -2212,6 +2225,7 @@ def generate_optimized_resume(
             "target_job_title": target_job_title,
         },
     )
+
 
     # -----------------------------------------------------
     # Final deterministic cleanup
