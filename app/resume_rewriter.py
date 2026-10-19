@@ -32,6 +32,22 @@ def rewrite_resume(
         client=client,
     )
 
+    print("\n[DEBUG] Project input count:", len(projects or []))
+    print("[DEBUG] Project input items:", repr(projects))
+    print(
+        "[DEBUG] Experience input type:",
+        type(experience).__name__,
+    )
+    print("[DEBUG] Experience input:", repr(experience))
+
+    print("\n[DEBUG] Project input count:", len(projects or []))
+    print("[DEBUG] Project input items:", repr(projects))
+    print(
+        "[DEBUG] Experience input type:",
+        type(experience).__name__,
+    )
+    print("[DEBUG] Experience input:", repr(experience))
+
     projects_result = rewrite_projects(
         projects=projects or [],
         resume_text=resume_text,

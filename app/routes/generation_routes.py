@@ -1,4 +1,4 @@
-"""Flask routes for optimized resume generation."""
+﻿"""Flask routes for optimized resume generation."""
 
 from pathlib import Path
 import logging
@@ -13,6 +13,7 @@ from flask import (
 from app.rag.runtime import get_knowledge_base_service
 from app.rag.config import RAGConfig
 from app.rag.optimization.service import RAGOptimizationService
+from app.resume_structurer import structure_resume
 from app.resume_generation_service import (
     generate_optimized_resume_documents,
 )
@@ -198,13 +199,15 @@ def generate_resume():
 
         # Generate the optimized FinalResume once and
         # render that same result to both DOCX and PDF.
+        resume_data = data.get("resume_data")
+        if not isinstance(resume_data, dict) or not resume_data:
+            resume_data = structure_resume(resume_text)
+
         result = generate_optimized_resume_documents(
             resume_text=resume_text,
             docx_output_path=docx_output_path,
             pdf_output_path=pdf_output_path,
-            resume_data=data.get(
-                "resume_data"
-            ),
+            resume_data=resume_data,
             job_description=job_description,
             ats_result=data.get(
                 "ats_result"

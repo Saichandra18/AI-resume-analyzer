@@ -2,7 +2,7 @@
 
 from copy import deepcopy
 import re
-
+from app.section_parser import parse_project_entries
 from app.name_extractor import extract_name
 from app.final_resume_models import build_final_resume
 from app.final_resume_validator import validate_final_resume
@@ -684,301 +684,187 @@ def _normalize_education(value):
     return [entry] if entry else []
 
 
-def _normalize_projects(
-    value,
-    original_items=None,
-):
-    """
-    Convert normalized Phase 10 project content into
-    canonical FinalResume project entries.
-    """
+def _normalize_projects(value, original_items=None):
+    """Normalize rewritten projects while preserving project boundaries."""
     if value is None:
         return []
 
     if not isinstance(value, list):
         value = [value]
 
-    original_items = (
-        original_items
-        if isinstance(original_items, list)
-        else []
+    original_items = original_items if isinstance(original_items, list) else []
+
+    def clean(item):
+        return _normalize_resume_text(item).strip()
+
+    def split_project_text(text):
+        """Split a multiline project description into its title and bullets."""
+        lines = [
+            clean(line)
+            for line in str(text or "").splitlines()
+            if clean(line)
+        ]
+        if not lines:
+            return "", []
+
+        title = lines[0].strip()
+        bullets = []
+        for line in lines[1:]:
+            # Keep the bullet marker and the source's compact formatting.
+            line = re.sub(r"^•\s+", "•", line)
+            if line:
+                bullets.append(line)
+        return title, bullets
+
+    source_projects = None
+    flat_string_source = (
+        len(original_items) > 1
+        and all(isinstance(item, str) for item in original_items)
     )
+    has_bullet_markers = flat_string_source and any(
+        re.match(r"^\s*(?:[•●▪◦‣]|\uf0b7|â€¢|ï‚·|[-*])\s*", item)
+        for item in original_items
+    )
+    if has_bullet_markers:
+        parsed = parse_project_entries(original_items)
+        if isinstance(parsed, list) and len(parsed) > 1:
+            source_projects = parsed
+
+    # If a rewrite collapsed several source projects into one incomplete
+    # response, recover each original project independently.
+    if source_projects and len(value) == 1:
+        item = value[0]
+        if isinstance(item, dict) and not (
+            item.get("bullets") or item.get("rewritten")
+        ):
+            recovered = []
+            for source_project in source_projects:
+                title = clean(source_project.get("title", ""))
+                bullets = [
+                    clean(bullet)
+                    for bullet in source_project.get("bullets", [])
+                    if clean(bullet)
+                ]
+                if title or bullets:
+                    recovered.append({"title": title, "bullets": bullets})
+            if recovered:
+                return recovered
 
     projects = []
-
     for index, item in enumerate(value):
         original = (
             original_items[index]
-            if index < len(original_items)
-            and isinstance(
-                original_items[index],
-                dict,
-            )
+            if index < len(original_items) and isinstance(original_items[index], dict)
             else {}
         )
 
         if isinstance(item, dict):
-            existing_title = (
-                item.get("title")
-                or item.get("name")
-                or ""
-            )
+            title = clean(item.get("title") or item.get("name") or "")
+            raw_bullets = item.get("bullets", [])
+            if not isinstance(raw_bullets, list):
+                raw_bullets = [raw_bullets]
+            bullets = [clean(bullet) for bullet in raw_bullets if clean(bullet)]
 
-            existing_bullets = item.get(
-                "bullets",
-                [],
-            )
+            rewritten_text = item.get("rewritten") or item.get("description") or ""
+            if rewritten_text and not title and not bullets:
+                title, bullets = split_project_text(rewritten_text)
+            elif rewritten_text and title and not bullets:
+                # The description may contain the title followed by bullet lines.
+                text_title, text_bullets = split_project_text(rewritten_text)
+                if text_bullets:
+                    if not title or title.casefold() == text_title.casefold():
+                        title = title or text_title
+                        bullets = text_bullets
+                    else:
+                        bullets = [clean(rewritten_text)]
 
-            # `_normalize_rewritten_collection` may represent a rewritten
-            # project as a description-only dictionary. With flat-string
-            # source projects, treating that description as the title loses
-            # the original project name and leaves no project bullets.
-            # Restore the source title and retain the rewritten description.
-            if (
-                not existing_title
-                and not existing_bullets
-                and isinstance(item.get("description"), str)
-                and item.get("description").strip()
-                and len(original_items) > 1
-                and all(
-                    isinstance(source_item, str)
-                    for source_item in original_items
-                )
-            ):
-                source_title = _normalize_resume_text(
-                    original_items[0]
-                )
-                rewritten_description = _normalize_resume_text(
-                    item["description"]
-                )
+            # A plain [title, description] source pair is one project.
+            if flat_string_source and not source_projects and not bullets:
+                source_title = clean(original_items[0])
                 source_descriptions = [
-                    _normalize_resume_text(source_item)
+                    clean(source_item)
                     for source_item in original_items[1:]
-                    if _normalize_resume_text(source_item)
+                    if clean(source_item)
                 ]
-
-                if source_title and rewritten_description:
-                    bullets = [rewritten_description]
-
-                    # If the rewrite is actually just a title-like fragment,
-                    # retain the source description instead of replacing it
-                    # with a fragment that discards the project's substance.
+                title = source_title
+                if rewritten_text:
                     title_tokens = {
-                        token.casefold()
-                        for token in source_title.split()
-                        if len(token) > 2
+                        token.casefold() for token in source_title.split() if len(token) > 2
                     }
                     rewritten_tokens = {
-                        token.casefold()
-                        for token in rewritten_description.split()
-                        if len(token) > 2
+                        token.casefold() for token in clean(rewritten_text).split() if len(token) > 2
                     }
-                    title_overlap = (
-                        len(title_tokens & rewritten_tokens)
-                        / max(len(title_tokens), 1)
-                    )
-                    if (
-                        len(rewritten_description.split()) <= 5
-                        or title_overlap >= 0.75
-                    ):
-                        bullets = source_descriptions or bullets
+                    overlap = len(title_tokens & rewritten_tokens) / max(len(title_tokens), 1)
+                    if len(clean(rewritten_text).split()) <= 5 or overlap >= 0.75:
+                        bullets = source_descriptions
                     else:
-                        # Preserve original source wording if the rewrite
-                        # drops it entirely; this protects factual detail and
-                        # important terminology from nondeterministic output.
+                        bullets = [clean(rewritten_text)]
+                        rewritten_norm = _keyword_normalize(rewritten_text)
                         for source_description in source_descriptions:
                             source_terms = {
-                                re.sub(r"[^a-z0-9]", "", token.casefold())[:5]
-                                for token in re.findall(
-                                    r"[a-zA-Z0-9]+",
-                                    source_description,
-                                )
+                                token for token in _keyword_normalize(source_description).split()
                                 if len(token) >= 8
                             }
-                            rewritten_terms = {
-                                re.sub(r"[^a-z0-9]", "", token.casefold())[:5]
-                                for token in re.findall(
-                                    r"[a-zA-Z0-9]+",
-                                    rewritten_description,
-                                )
-                                if len(token) >= 8
-                            }
-                            if source_terms - rewritten_terms:
-                                bullets.append(source_description)
+                            if any(term not in rewritten_norm for term in source_terms):
+                                if source_description not in bullets:
+                                    bullets.append(source_description)
+                else:
+                    bullets = source_descriptions
 
-                    projects.append({
-                        "title": source_title,
-                        "bullets": bullets,
-                    })
-                    continue
+            if not title and rewritten_text and not bullets:
+                title, bullets = split_project_text(rewritten_text)
+            elif rewritten_text and not bullets:
+                bullets = [clean(rewritten_text)]
 
-            # A rewrite can occasionally return only a project title
-            # (sometimes with a generic suffix such as "platform") and
-            # omit the description entirely. When the source consists of
-            # flat strings and the single rewritten entry clearly starts
-            # with the original first string, retain the source description
-            # instead of silently dropping factual project content.
-            if (
-                not existing_bullets
-                and existing_title
-                and len(value) == 1
-                and len(original_items) > 1
-                and all(
-                    isinstance(source_item, str)
-                    for source_item in original_items
-                )
-            ):
-                source_title = _normalize_resume_text(
-                    original_items[0]
-                )
-                normalized_existing_title = _normalize_resume_text(
-                    existing_title
-                )
-                # Do not require the rewritten title to resemble the source
-                # title. A rewrite may rename the project while accidentally
-                # omitting its description; preserve the original source title
-                # and description rather than silently losing factual content.
-                if source_title:
-                    source_bullets = [
-                        _normalize_resume_text(source_item)
-                        for source_item in original_items[1:]
-                        if _normalize_resume_text(source_item)
-                    ]
-                    if source_bullets:
-                        project = {
-                            "title": source_title,
-                            "bullets": source_bullets,
-                        }
-                        projects.append(project)
-                        continue
-
-            if existing_bullets:
-                if not isinstance(
-                    existing_bullets,
-                    list,
-                ):
-                    existing_bullets = [
-                        existing_bullets
-                    ]
-
-                bullets = []
-                for bullet in existing_bullets:
-                    cleaned_bullet = _normalize_resume_text(
-                        bullet
-                    )
-                    if not cleaned_bullet:
-                        continue
-                    if cleaned_bullet.startswith("• "):
-                        cleaned_bullet = "•" + cleaned_bullet[2:]
-                    bullets.append(cleaned_bullet)
-
-                project = {
-                    "title": (
-                        existing_title
-                        or original.get("title")
-                        or original.get("name")
-                        or ""
-                    ),
-                    "bullets": bullets,
-                }
-
-                technologies = (
-                    original.get("technologies")
-                    or item.get("technologies")
-                )
-
-                if technologies:
-                    project["technologies"] = deepcopy(
-                        technologies
-                    )
-
-                if project["title"] or project["bullets"]:
-                    projects.append(project)
-
-                continue
-
-            rewritten_text = (
-                item.get("rewritten")
-                or item.get("description")
-                or ""
-            )
-        else:
-            rewritten_text = item
-
-        if rewritten_text is None:
-            rewritten_text = ""
-
-        lines = []
-        for line in str(rewritten_text).splitlines():
-            if not line.strip():
-                continue
-            cleaned_line = _normalize_resume_text(line)
-            if cleaned_line.startswith("• "):
-                cleaned_line = "•" + cleaned_line[2:]
-            if cleaned_line:
-                lines.append(cleaned_line)
-
-        if not lines:
+            project = {"title": title, "bullets": bullets}
+            technologies = original.get("technologies") or item.get("technologies")
+            if technologies:
+                project["technologies"] = deepcopy(technologies)
+            if project["title"] or project["bullets"]:
+                projects.append(project)
             continue
 
-        original_title = (
-            original.get("title")
-            or original.get("name")
-            or ""
-        )
+        rewritten_text = clean(item)
+        if not rewritten_text:
+            continue
 
-        # If the source project is represented as strings rather than
-        # structured dictionaries, recover its title when the rewritten
-        # text starts with that exact title followed by a separator.
-        # This prevents a combined "title - description" rewrite from
-        # becoming one oversized title with no project bullets.
-        if not original_title and len(lines) == 1:
-            rewritten_line = lines[0]
-            for candidate in original_items:
-                if not isinstance(candidate, str):
-                    continue
-
-                candidate = _normalize_resume_text(candidate)
-                if not candidate:
-                    continue
-
-                for separator in (" - ", " – ", " — ", ": "):
-                    prefix = candidate + separator
-                    if rewritten_line.casefold().startswith(
-                        prefix.casefold()
-                    ):
-                        remaining = rewritten_line[len(prefix):].strip()
-                        if remaining:
-                            original_title = candidate
-                            lines = [candidate, remaining]
-                            break
-
-                if original_title:
-                    break
-
+        original_title = clean(original.get("title") or original.get("name") or "")
+        lines = [clean(line) for line in str(item).splitlines() if clean(line)]
         if len(lines) > 1:
-            title = lines[0]
-            bullets = lines[1:]
+            title = original_title or lines[0]
+            bullets = [re.sub(r"^•\s+", "•", line) for line in lines[1:]]
         elif original_title:
-            title = original_title
-            bullets = lines
+            title, bullets = original_title, [rewritten_text]
         else:
-            title = lines[0]
-            bullets = []
+            title, bullets = rewritten_text, []
 
-        project = {
-            "title": title,
-            "bullets": bullets,
-        }
-
+        project = {"title": title, "bullets": bullets}
         if original.get("technologies"):
-            project["technologies"] = deepcopy(
-                original["technologies"]
-            )
-
+            project["technologies"] = deepcopy(original["technologies"])
         projects.append(project)
 
-    return projects
+    # Remove exact duplicate entries only; never merge distinct projects.
+    unique_projects = []
+    seen_projects = set()
+    for project in projects:
+        title_key = clean(project.get("title", "")).casefold()
+        bullets = project.get("bullets", [])
+        if not isinstance(bullets, list):
+            bullets = [bullets]
+        bullets_key = tuple(clean(bullet).casefold() for bullet in bullets if clean(bullet))
+        technologies = project.get("technologies", [])
+        if isinstance(technologies, list):
+            technologies_key = tuple(
+                sorted(clean(value).casefold() for value in technologies if clean(value))
+            )
+        else:
+            technologies_key = clean(technologies).casefold()
+        signature = (title_key, bullets_key, technologies_key)
+        if signature not in seen_projects:
+            seen_projects.add(signature)
+            unique_projects.append(project)
+
+    return unique_projects
 
 
 def _normalize_rewritten_collection(
@@ -1150,33 +1036,31 @@ def _normalize_rewritten_collection(
                         location = cleaned_line
                         continue
 
+
                     if cleaned_line.startswith(
                         (
-                            "•",
-                            "",
+                            "\u2022",  # Bullet: •
+                            "\uf0b7",  # Word bullet
                             "-",
-                            "–",
-                            "—",
+                            "\u2013",  # En dash: –
+                            "\u2014",  # Em dash: —
+                            "â€¢",
+                            "ï‚·",
+                            "â€“",
+                            "â€”",
                         )
                     ):
-                        # Preserve the canonical bullet marker expected
-                        # by the existing FinalResume/tests while
-                        # removing duplicate whitespace/alternate
-                        # extraction markers.
                         cleaned_line = re.sub(
-                            r"^[•\-\u2013\u2014]+\s*",
+                            r"^(?:\u2022|\uf0b7|â€¢|ï‚·|-|\u2013|\u2014|â€“|â€”)+\s*",
                             "",
                             cleaned_line,
                         ).strip()
 
                         if cleaned_line:
                             bullets.append(
-                                f"• {cleaned_line}"
+                                f"\u2022 {cleaned_line}"
                             )
-
-                            current_bullet = (
-                                len(bullets) - 1
-                            )
+                            current_bullet = len(bullets) - 1
 
                         continue
 
@@ -2099,6 +1983,22 @@ def generate_optimized_resume(
         )
     )
 
+    # Project content is candidate-owned factual data. Never let an empty
+    # rewrite/selection response silently remove the Projects section when
+    # the source resume contains projects. Prefer rewritten, normalized
+    # entries; if those are empty, normalize the original source entries.
+    if not selected_sections.get("projects"):
+        project_fallback = rewritten_sections.get("projects") or []
+
+        if not project_fallback:
+            project_fallback = _normalize_projects(
+                resume_data.get("projects", []),
+                original_items=resume_data.get("projects", []),
+            )
+
+        if project_fallback:
+            selected_sections["projects"] = deepcopy(project_fallback)
+
     # Skills are factual candidate data. Do not allow the
     # generic item-count length controller to silently discard
     # genuine source skills.
@@ -2179,7 +2079,7 @@ def generate_optimized_resume(
         allow_single_token_keywords=rag_service is not None,
     )
 
-   
+
     # Recover the candidate's name if structured data is missing it.
     personal_info = resume_data.get("personal_info")
 

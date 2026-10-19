@@ -68,3 +68,40 @@ def test_project_description_is_preserved_when_rewrite_returns_title_only():
         or "optimizing" in bullet.lower()
         for bullet in result[0]["bullets"]
     )
+
+
+def test_flat_source_projects_keep_their_own_titles_and_bullets():
+    rewritten = [
+        {
+            "description": "Rewritten project description",
+            "bullets": [],
+        }
+    ]
+
+    original = [
+        "AI Resume Analyzer",
+        "- Built an AI-powered resume analysis platform.",
+        "- Implemented ATS matching.",
+        "Cricket Match Analytics Dashboard",
+        "- Analyzed cricket match statistics.",
+        "- Created team performance analytics.",
+    ]
+
+    result = _normalize_projects(
+        rewritten,
+        original_items=original,
+    )
+
+    assert len(result) == 2
+
+    assert result[0]["title"] == "AI Resume Analyzer"
+    assert result[0]["bullets"] == [
+        "Built an AI-powered resume analysis platform.",
+        "Implemented ATS matching.",
+    ]
+
+    assert result[1]["title"] == "Cricket Match Analytics Dashboard"
+    assert result[1]["bullets"] == [
+        "Analyzed cricket match statistics.",
+        "Created team performance analytics.",
+    ]

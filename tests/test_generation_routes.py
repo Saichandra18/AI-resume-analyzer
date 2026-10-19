@@ -408,7 +408,9 @@ def test_generation_route_uses_default_generation_options(
     )
     assert captured["target_pages"] == 1
     assert captured["target_job_title"] is None
-    assert captured["resume_data"] is None
+    assert isinstance(captured["resume_data"], dict)
+    assert captured["resume_data"]["raw_text"] == "Python developer"
+    assert captured["resume_data"]["skills"] == ["Python"]
     assert captured["tailoring_plan"] is None
 
 def test_generation_route_returns_required_response_fields(
@@ -969,3 +971,106 @@ def test_generation_route_logs_exception(
         "Simulated generation failure"
         in caplog.text
     )
+
+
+def test_generation_route_rebuilds_missing_resume_data(
+    client,
+    monkeypatch,
+    tmp_path,
+):
+    reconstructed_data = {
+        "personal_info": {
+            "name": "Test User",
+            "email": "test@example.com",
+        },
+        "skills": ["Python", "SQL"],
+        "experience": {
+            "section": ["Built Python applications"],
+            "job_titles": ["Python Developer"],
+            "years": [],
+        },
+        "projects": ["AI Resume Analyzer"],
+        "education": {
+            "section": ["Bachelor of Technology"],
+            "degrees": ["B.Tech"],
+            "years": [],
+        },
+        "certifications": [],
+    }
+
+    captured = {}
+
+    def fake_structure_resume(resume_text):
+        captured["resume_text"] = resume_text
+        return reconstructed_data
+
+    class FakeFinalResume:
+        def to_dict(self):
+            return {
+                "personal_info": reconstructed_data["personal_info"],
+                "summary": "Python developer",
+                "skills": reconstructed_data["skills"],
+                "experience": reconstructed_data["experience"]["section"],
+                "projects": reconstructed_data["projects"],
+                "education": reconstructed_data["education"]["section"],
+                "certifications": [],
+                "section_order": [
+                    "summary",
+                    "skills",
+                    "experience",
+                    "projects",
+                    "education",
+                ],
+                "metadata": {"target_pages": 1},
+            }
+
+    def fake_generate(**kwargs):
+        captured["resume_data"] = kwargs["resume_data"]
+
+        return {
+            "final_resume": FakeFinalResume(),
+            "tailoring_plan": {},
+            "rewrite_result": {},
+            "length_control": {},
+            "validation": {
+                "valid": True,
+                "errors": [],
+                "warnings": [],
+            },
+            "document_path": tmp_path / "optimized_resume.docx",
+            "pdf_path": tmp_path / "optimized_resume.pdf",
+        }
+
+    monkeypatch.setattr(
+        "app.routes.generation_routes.structure_resume",
+        fake_structure_resume,
+    )
+    monkeypatch.setattr(
+        "app.routes.generation_routes.generate_optimized_resume_documents",
+        fake_generate,
+    )
+
+    resume_text = (
+        "Test User\n"
+        "Email: test@example.com\n"
+        "Skills: Python, SQL\n"
+        "Experience: Built Python applications\n"
+        "Projects: AI Resume Analyzer\n"
+        "Education: Bachelor of Technology"
+    )
+
+    response = client.post(
+        "/api/resume/generate",
+        json={
+            "resume_text": resume_text,
+            "resume_data": {},
+            "job_description": "Python developer with SQL skills",
+            "target_pages": 1,
+        },
+    )
+
+    assert response.status_code == 200
+    assert captured["resume_text"] == resume_text
+    assert captured["resume_data"] == reconstructed_data
+    assert captured["resume_data"]["skills"] == ["Python", "SQL"]
+    assert captured["resume_data"]["projects"] == ["AI Resume Analyzer"]

@@ -1,4 +1,4 @@
-* {
+﻿* {
     box-sizing: border-box;
 }
 
@@ -458,6 +458,17 @@ button:hover {
 
 .generation-download {
     margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: stretch;
+}
+
+.generation-download button {
+    flex: 1 1 200px;
+    width: auto;
+    min-width: 0;
+    margin: 0;
 }
 
 #target-job-title {
@@ -468,7 +479,7 @@ button:hover {
     font: inherit;
 }
 
-/* Phase 16 — Resume template selection */
+/* Phase 16 â€” Resume template selection */
 .resume-rewrite select,
 #resume-template {
     width: 100%;
@@ -552,7 +563,7 @@ button:hover {
 }
 
 /* =========================================================
-   Phase 16.4 — ATS Optimization Results
+   Phase 16.4 â€” ATS Optimization Results
    ========================================================= */
 
 .generation-ats-results {

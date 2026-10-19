@@ -1,4 +1,4 @@
-const resumeInput = document.getElementById("resume");
+﻿const resumeInput = document.getElementById("resume");
 const jobDescriptionInput = document.getElementById(
     "job-description"
 );
@@ -241,7 +241,7 @@ function displayGenerationATSResults(
             </span>
 
             <span class="ats-component-arrow">
-                →
+                â†’
             </span>
 
             <span class="ats-component-after">
@@ -612,7 +612,7 @@ function updateGenerationProgress(
             step.classList.add("completed");
 
             if (icon) {
-                icon.textContent = "✓";
+                icon.textContent = "âœ“";
             }
 
             return;
@@ -622,14 +622,14 @@ function updateGenerationProgress(
             step.classList.add("active");
 
             if (icon) {
-                icon.textContent = "●";
+                icon.textContent = "â—";
             }
 
             return;
         }
 
         if (icon) {
-            icon.textContent = "○";
+            icon.textContent = "â—‹";
         }
     });
 }
@@ -786,7 +786,7 @@ label.textContent =
 
             status.textContent =
                 component.present
-                    ? `✓ ${component.score}`
+                    ? `âœ“ ${component.score}`
                     : "Missing";
 
             item.appendChild(label);
@@ -884,7 +884,7 @@ label.textContent =
 
 function displayResumeContentQuality(data) {
     const resume_content_quality =
-        data.resume_content_quality || {};
+        data.resume_content_quality || data.content_quality || {};
 
     const scoreElement = document.getElementById(
         "resume-content-quality-score"
@@ -1057,7 +1057,7 @@ function displayImprovementSuggestions(data) {
         type.textContent =
             `${formatLabel(
                 suggestion.type || "Improvement"
-            )} • ${
+            )} â€¢ ${
                 suggestion.priority || "medium"
             }`;
 
@@ -2228,7 +2228,7 @@ generateResumeButton.addEventListener(
                 analysis.resume_quality || {},
 
             content_quality:
-                analysis.resume_content_quality || {},
+                analysis.resume_content_quality || analysis.content_quality || {},
 
             improvement_suggestions:
                 analysis.improvement_suggestions || [],

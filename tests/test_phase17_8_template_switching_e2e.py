@@ -255,13 +255,20 @@ def test_template_switching_preserves_candidate_content():
                 response
             )
 
-            assert_candidate_content(
-                extract_docx_text(docx_path)
+            # Identify which template loses the project title.
+            docx_text = extract_docx_text(docx_path)
+            assert "ai resume analyzer" in docx_text.lower(), (
+                f"Project title missing for template={template!r}. "
+                f"Generated DOCX text:\n{docx_text}"
             )
+            assert_candidate_content(docx_text)
 
-            assert_candidate_content(
-                extract_pdf_text(pdf_path)
+            pdf_text = extract_pdf_text(pdf_path)
+            assert "ai resume analyzer" in pdf_text.lower(), (
+                f"Project title missing from PDF for template={template!r}. "
+                f"Extracted PDF text:\n{pdf_text}"
             )
+            assert_candidate_content(pdf_text)
 
             assert data["final_resume"]
 
