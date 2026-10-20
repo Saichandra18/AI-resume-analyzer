@@ -44,14 +44,68 @@ _TITLE_COMPANY_SPLIT = re.compile(r"\s+[\u2013\u2014@|-]\s+|\s*\|\s*|\s+at\s+")
 # Low-level helpers
 # ---------------------------------------------------------------------------
 
+# Words that normally follow a hyphen in a compound ("role-specific",
+# "AI-powered"), so a line break after the hyphen must keep the hyphen.
+_COMPOUND_TAILS = {
+    "friendly", "powered", "driven", "specific", "based", "aware", "level",
+    "time", "quality", "scale", "ready", "oriented", "centric", "wide",
+    "first", "free", "grade", "tuned", "enabled", "native", "class", "end",
+    "party", "facing", "aligned", "focused", "critical", "ended", "sourced",
+}
+# After a dangling hyphen these start a *new* word ("pre- and post-").
+_SEPARATE_WORDS = {"and", "or", "to", "of", "the", "through", "for", "in"}
+
+
+def hyphen_join(left, right):
+    """Join text ending in '-' with the next line's text.
+
+    "Process-" + "ing"          -> "Processing"      (word broken by wrapping)
+    "ana-" + "lytical"          -> "analytical"
+    "Retrieval-" + "Augmented"  -> "Retrieval-Augmented"
+    "AI-" + "powered"           -> "AI-powered"
+    "role-" + "specific"        -> "role-specific"
+    "pre-" + "and post"         -> "pre- and post"
+    """
+    stem = left[:-1]
+    tail = re.search(r"[A-Za-z]+$", stem)
+    head = re.match(r"[A-Za-z]+", right)
+
+    if not tail or not head:
+        return left + right
+
+    first_word = head.group(0)
+
+    if first_word.lower() in _SEPARATE_WORDS:
+        return left + " " + right
+
+    if (
+        tail.group(0).isupper()
+        or first_word[0].isupper()
+        or first_word.lower() in _COMPOUND_TAILS
+    ):
+        return left + right
+
+    return stem + right
+
+
+def repair_hyphen_breaks(text):
+    """Re-join words that a PDF broke across lines (or left as 'Word- ing')."""
+    if not text:
+        return text
+
+    # Require an actual break (newline or space) after the hyphen so that
+    # normal compounds such as "cross-validation" are never touched.
+    return re.sub(
+        r"([A-Za-z]+-)(?:[ \t]*\n[ \t]*|[ \t]+)([A-Za-z]+)",
+        lambda m: hyphen_join(m.group(1), m.group(2)),
+        text,
+    )
+
+
 def _join_wrapped(previous, line):
     """Join a wrapped continuation line onto the previous text."""
     if previous.endswith("-") and len(previous) > 1 and previous[-2].isalpha():
-        if line[:1].islower():
-            # "ana-" + "lytical" -> "analytical"
-            return previous[:-1] + line
-        # "Retrieval-" + "Augmented" -> "Retrieval-Augmented"
-        return previous + line
+        return hyphen_join(previous, line)
     return previous + " " + line
 
 

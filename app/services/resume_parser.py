@@ -2,6 +2,8 @@ import re
 from pathlib import Path
 
 from pypdf import PdfReader
+
+from app.section_parser import repair_hyphen_breaks
 from docx import Document
 
 from app.resume_structurer import structure_resume
@@ -43,7 +45,7 @@ def extract_text_from_pdf(file_path):
     text = _extract_pdf_text_with_pdfplumber(file_path)
 
     if text:
-        return text
+        return repair_hyphen_breaks(text)
 
     reader = PdfReader(file_path)
 
@@ -55,7 +57,8 @@ def extract_text_from_pdf(file_path):
         if page_text:
             text += page_text + "\n"
 
-    return text.strip()
+    # Re-join words the PDF broke across lines ("Process-" / "ing").
+    return repair_hyphen_breaks(text.strip())
 
 
 def extract_text_from_docx(file_path):

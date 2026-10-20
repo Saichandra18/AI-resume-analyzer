@@ -479,7 +479,7 @@ button:hover {
     font: inherit;
 }
 
-/* Phase 16 â€” Resume template selection */
+/* Phase 16 — Resume template selection */
 .resume-rewrite select,
 #resume-template {
     width: 100%;
@@ -563,7 +563,7 @@ button:hover {
 }
 
 /* =========================================================
-   Phase 16.4 â€” ATS Optimization Results
+   Phase 16.4 — ATS Optimization Results
    ========================================================= */
 
 .generation-ats-results {

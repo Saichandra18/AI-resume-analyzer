@@ -448,3 +448,89 @@ def test_final_skills_have_no_duplicates():
 
     assert not ("neural networks" in lowered and "neural network" in lowered)
     assert not ("llm" in lowered and "large language models" in lowered)
+
+
+# ---------------------------------------------------------------------------
+# Third round: lost summary, "maintain ing", hyphen breaks
+# ---------------------------------------------------------------------------
+
+from app.resume_generation_pipeline import _repair_glued_words  # noqa: E402
+from app.section_parser import hyphen_join, repair_hyphen_breaks  # noqa: E402
+
+
+def _is_summary_prompt(prompt):
+    return "ORIGINAL SUMMARY" in prompt or '"rewritten": "improved summary text"' in prompt
+
+
+class EmptySummaryClient(IdentityClient):
+    """The model answers the summary request with an empty JSON object."""
+
+    def generate(self, prompt):
+        if _is_summary_prompt(prompt):
+            return "{}"
+        return super().generate(prompt)
+
+
+class ProseSummaryClient(IdentityClient):
+    """The model answers the summary request with prose instead of JSON."""
+
+    def generate(self, prompt):
+        if _is_summary_prompt(prompt):
+            return "Sure! Here is an improved summary of your profile."
+        return super().generate(prompt)
+
+
+def _generate_with(client):
+    return generate_optimized_resume(
+        resume_text=RESUME_TEXT,
+        resume_data=structure_resume(RESUME_TEXT),
+        job_description=JOB_DESCRIPTION,
+        target_pages=2,
+        client=client,
+    )["final_resume"]
+
+
+def test_empty_summary_rewrite_keeps_the_resumes_own_summary():
+    summary = _generate_with(EmptySummaryClient()).summary
+
+    assert summary.startswith("AI/ML Engineer with hands-on experience")
+
+
+def test_non_json_summary_rewrite_keeps_the_resumes_own_summary():
+    summary = _generate_with(ProseSummaryClient()).summary
+
+    assert summary.startswith("AI/ML Engineer with hands-on experience")
+
+
+def test_glued_word_repair_never_splits_off_a_suffix():
+    vocabulary = {"maintain", "ing", "ensure", "perform", "ed", "prompt", "evaluation"}
+
+    repaired = _repair_glued_words("maintaining ensuring performed", vocabulary)
+
+    assert repaired == "maintaining ensuring performed"
+
+
+def test_glued_word_repair_still_splits_real_glued_words():
+    vocabulary = {"performed", "prompt", "output", "analysis"}
+
+    assert _repair_glued_words("performedprompt outputanalysis", vocabulary) == (
+        "performed prompt output analysis"
+    )
+
+
+def test_words_broken_across_lines_are_rejoined():
+    assert repair_hyphen_breaks("Natural Language Process-\ning, and Big Data") == (
+        "Natural Language Processing, and Big Data"
+    )
+    assert repair_hyphen_breaks("Natural Language Process- ing") == (
+        "Natural Language Processing"
+    )
+
+
+def test_real_hyphenated_compounds_are_left_alone():
+    text = "cross-validation, role-specific, AI-powered, end-to-end, pre- and post-processing"
+
+    assert repair_hyphen_breaks(text) == text
+    assert hyphen_join("Retrieval-", "Augmented") == "Retrieval-Augmented"
+    assert hyphen_join("AI-", "powered") == "AI-powered"
+    assert hyphen_join("role-", "specific") == "role-specific"

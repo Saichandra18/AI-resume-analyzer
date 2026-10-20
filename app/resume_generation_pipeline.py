@@ -1,6 +1,7 @@
 """End-to-end JD-optimized resume generation pipeline."""
 
 from copy import deepcopy
+import logging
 import re
 from app.section_parser import parse_project_entries
 from app.name_extractor import extract_name
@@ -21,7 +22,10 @@ from app.section_parser import (
     get_experience_entries,
     get_project_entries,
     merge_rewritten_entries,
+    repair_hyphen_breaks,
 )
+
+_LOG = logging.getLogger(__name__)
 
 
 # Raw ATS keyword lists must never be glued onto the end of the summary
@@ -235,15 +239,30 @@ def _guard_summary_against_job_description(summary, resume_text, job_description
     that appear in the job description but nowhere in the resume.
     """
     summary = _normalize_resume_text(summary)
+
+    def original_summary():
+        return _normalize_resume_text(
+            repair_hyphen_breaks(_extract_labeled_summary(resume_text))
+        )
+
+    # The model returned nothing usable (empty object, prose instead of
+    # JSON, ...): keep the candidate's own summary rather than dropping the
+    # whole Professional Summary section.
+    if not summary:
+        original = original_summary()
+        if original:
+            _LOG.warning("Summary rewrite was empty; using the resume's own summary.")
+        return original
+
     leaked = _job_description_terms_in_summary(summary, resume_text, job_description)
     total = max(len(_summary_stems(summary)), 1)
 
     if len(leaked) < 3 or len(leaked) / total < 0.15:
         return summary
 
-    original = _normalize_resume_text(_extract_labeled_summary(resume_text))
+    _LOG.warning("Summary copied job-description wording; using the resume's own summary.")
 
-    return original or summary
+    return original_summary() or summary
 
 
 DEFAULT_COLLECTION_SECTIONS = (
@@ -572,6 +591,14 @@ def _build_source_word_lexicon(resume_text, job_description, resume_data):
     return words
 
 
+_SPLIT_SUFFIXES = {
+    "ing", "ings", "ed", "er", "ers", "es", "est", "ly", "ion", "ions",
+    "tion", "tions", "sion", "ment", "ments", "ness", "able", "ible",
+    "ful", "less", "ize", "ise", "ized", "ised", "izing", "ising", "ity",
+    "ities", "ance", "ence", "ous", "ive", "ives", "al", "ally", "ify",
+}
+
+
 def _repair_glued_words(value, vocabulary):
     """Repair obvious glued words without changing technical terms."""
     if not isinstance(value, str) or not value:
@@ -593,9 +620,13 @@ def _repair_glued_words(value, vocabulary):
 
         # Find the best two-word split supported by trusted vocabulary.
         best = None
-        for cut in range(2, len(lower) - 2):
+        for cut in range(3, len(lower) - 2):
             left = lower[:cut]
             right = lower[cut:]
+            # Never split off a bare suffix: "maintaining" is not
+            # "maintain ing".
+            if left in _SPLIT_SUFFIXES or right in _SPLIT_SUFFIXES:
+                continue
             if left in vocabulary and right in vocabulary:
                 score = len(left) + len(right)
                 if best is None or score > best[0]:

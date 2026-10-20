@@ -241,7 +241,7 @@ function displayGenerationATSResults(
             </span>
 
             <span class="ats-component-arrow">
-                â†’
+                →
             </span>
 
             <span class="ats-component-after">
@@ -612,7 +612,7 @@ function updateGenerationProgress(
             step.classList.add("completed");
 
             if (icon) {
-                icon.textContent = "âœ“";
+                icon.textContent = "✓";
             }
 
             return;
@@ -622,14 +622,14 @@ function updateGenerationProgress(
             step.classList.add("active");
 
             if (icon) {
-                icon.textContent = "â—";
+                icon.textContent = "●";
             }
 
             return;
         }
 
         if (icon) {
-            icon.textContent = "â—‹";
+            icon.textContent = "○";
         }
     });
 }
@@ -786,7 +786,7 @@ label.textContent =
 
             status.textContent =
                 component.present
-                    ? `âœ“ ${component.score}`
+                    ? `✓ ${component.score}`
                     : "Missing";
 
             item.appendChild(label);
@@ -1057,7 +1057,7 @@ function displayImprovementSuggestions(data) {
         type.textContent =
             `${formatLabel(
                 suggestion.type || "Improvement"
-            )} â€¢ ${
+            )} • ${
                 suggestion.priority || "medium"
             }`;
 
