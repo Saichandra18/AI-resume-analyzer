@@ -104,6 +104,7 @@ RULES:
 - Improve clarity, professionalism, and relevance.
 - Do not exaggerate the candidate's experience.
 - Do not treat the job description as evidence of candidate experience.
+- Never copy sentences, duties, or phrases from the job description into the summary.
 
 Return exactly one object:
 

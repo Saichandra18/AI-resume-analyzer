@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 from pypdf import PdfReader
@@ -6,8 +7,44 @@ from docx import Document
 from app.resume_structurer import structure_resume
 
 
+def _extract_pdf_text_with_pdfplumber(file_path):
+    """Extract PDF text with pdfplumber, which keeps word spacing intact.
+
+    pypdf glues words together on many resume PDFs ("ofLarge",
+    "Performedprompt"). Returns "" when pdfplumber is unavailable or fails
+    so the caller can fall back to pypdf.
+    """
+    try:
+        import pdfplumber
+    except ImportError:
+        return ""
+
+    try:
+        with pdfplumber.open(file_path) as document:
+            pages = [
+                # x_tolerance=2 (default 3) keeps tightly spaced words on
+                # justified lines apart ("Contributedtotraining...").
+                page.extract_text(x_tolerance=2) or ""
+                for page in document.pages
+            ]
+    except Exception:
+        return ""
+
+    text = "\n".join(pages)
+
+    # Icon glyphs (phone, mail, LinkedIn, ...) come through as "(cid:131)".
+    text = re.sub(r"\(cid:\d+\)", " ", text)
+
+    return text.strip()
+
+
 def extract_text_from_pdf(file_path):
     """Extract text from a PDF resume."""
+    text = _extract_pdf_text_with_pdfplumber(file_path)
+
+    if text:
+        return text
+
     reader = PdfReader(file_path)
 
     text = ""

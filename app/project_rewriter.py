@@ -4,6 +4,7 @@ from app.ai import create_llm_provider
 from app.ai.providers import LLMProvider
 from app.rewrite_models import build_rewrite_output
 from app.rewrite_validator import validate_rewrite
+from app.section_parser import format_items_for_prompt
 
 
 import re
@@ -13,6 +14,10 @@ import re
 def _group_project_lines(projects):
     """Group flat extracted project lines into title-and-bullet blocks."""
     if not isinstance(projects, list):
+        return projects
+
+    # Already grouped into one block per project (structured entries).
+    if any(isinstance(item, str) and "\n" in item for item in projects):
         return projects
 
     grouped = []
@@ -161,7 +166,7 @@ def rewrite_projects(
 Rewrite the following existing resume project content.
 
 PROJECTS:
-{projects}
+{format_items_for_prompt(projects)}
 
 ORIGINAL RESUME:
 {resume_text}
@@ -188,6 +193,7 @@ RULES:
   original resume.
 - Improve clarity, professionalism, and impact.
 - Do not exaggerate the project.
+- Never upgrade the candidate's role: do not change "Contributed to", "Assisted", or "Supported" into "Developed", "Built", or "Led".
 - Do not change the actual scope of the project.
 - Treat each input block as exactly one project.
 - Never combine content from different projects.

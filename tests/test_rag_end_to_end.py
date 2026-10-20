@@ -756,7 +756,10 @@ def test_real_rag_flows_into_final_resume(monkeypatch):
         "Python developer with machine learning experience."
     )
 
-    assert "sql" in final_resume.summary.lower()
+    # Supported JD keywords now live in Skills, not in a raw keyword
+    # sentence appended to the summary.
+    assert "core areas include" not in final_resume.summary.lower()
+    assert "sql" in [skill.lower() for skill in final_resume.skills]
 
 
 def test_real_rag_payload_is_attached_to_tailoring_plan():

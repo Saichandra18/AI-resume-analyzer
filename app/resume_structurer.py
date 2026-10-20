@@ -13,6 +13,7 @@ from app.name_extractor import extract_name
 from app.project_extractor import find_project_section
 from app.skill_extractor import extract_skills
 from app.certification_extractor import find_certification_section
+from app.section_parser import attach_entries
 
 
 def structure_resume(text):
@@ -65,5 +66,9 @@ def structure_resume(text):
         "projects": find_project_section(text),
         "certifications": find_certification_section(text),
     }
+
+    # Add structured experience/project entries (title, company, dates,
+    # bullets) next to the legacy flat lists.
+    attach_entries(resume_data)
 
     return resume_data

@@ -3,6 +3,7 @@ from app.ai.providers import LLMProvider
 from app.rewrite_models import build_rewrite_output
 import json
 from app.rewrite_validator import validate_rewrite
+from app.section_parser import format_items_for_prompt
 
 
 def rewrite_experience(
@@ -24,7 +25,7 @@ def rewrite_experience(
 Rewrite the following existing resume experience content.
 
 EXPERIENCE:
-{experience}
+{format_items_for_prompt(experience)}
 
 ORIGINAL RESUME:
 {resume_text}
@@ -50,6 +51,9 @@ RULES:
   original resume.
 - Improve clarity, professionalism, and impact.
 - Do not exaggerate the candidate's experience.
+- Never upgrade the candidate's role: do not change "Contributed to", "Assisted", or "Supported" into "Developed", "Built", or "Led".
+- Treat each ITEM as exactly one job; never merge or split items.
+- Keep each item's bullets on separate lines starting with a bullet.
 
 Return one rewritten item for each original experience item.
 

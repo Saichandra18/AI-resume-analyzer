@@ -10,10 +10,240 @@ from app.resume_content_prioritizer import prioritize_content
 from app.resume_content_selector import rank_content
 from app.resume_length_controller import control_resume_length
 from app.resume_rewriter import rewrite_resume
+from app.summary_rewriter import _extract_labeled_summary
 from app.resume_section_orderer import order_sections
 from app.resume_tailoring import generate_tailoring_plan
 from app.job_description_analyzer import analyze_job_description
 from app.rag.optimization.service import RAGOptimizationService
+from app.section_parser import (
+    attach_entries,
+    entry_to_block,
+    get_experience_entries,
+    get_project_entries,
+    merge_rewritten_entries,
+)
+
+
+# Raw ATS keyword lists must never be glued onto the end of the summary
+# ("Core areas include ci cd, ml, genai, cd.").  Supported keywords are
+# merged into the Skills section instead, where a keyword list belongs.
+APPEND_KEYWORDS_TO_SUMMARY = False
+
+_KEYWORD_DISPLAY = {
+    "ci cd": "CI/CD",
+    "cicd": "CI/CD",
+    "ml": "ML",
+    "ai": "AI",
+    "llm": "LLM",
+    "llms": "LLMs",
+    "genai": "Generative AI",
+    "rag": "RAG",
+    "nlp": "NLP",
+    "sql": "SQL",
+    "etl": "ETL",
+    "api": "API",
+    "apis": "APIs",
+    "aws": "AWS",
+    "gcp": "GCP",
+    "pyspark": "PySpark",
+    "tensorflow": "TensorFlow",
+    "pytorch": "PyTorch",
+    "retrieval augmented generation": "Retrieval-Augmented Generation",
+}
+
+# Different spellings of the same skill, used only to avoid duplicates.
+_KEYWORD_ALIASES = {
+    "genai": "generative ai",
+    "llms": "llm",
+    "large language models": "llm",
+    "large language model": "llm",
+    "retrieval augmented generation": "rag",
+    "cicd": "ci cd",
+    "natural language processing": "nlp",
+    "machine learning": "ml",
+}
+
+_SHORT_KEYWORDS_ALLOWED = {"ml", "ai", "qa", "r", "c", "go"}
+
+
+def _canonical_keyword(value):
+    key = _keyword_normalize(value)
+    return _KEYWORD_ALIASES.get(key, key)
+
+
+def _display_keyword(value):
+    key = _keyword_normalize(value)
+    if key in _KEYWORD_DISPLAY:
+        return _KEYWORD_DISPLAY[key]
+    return " ".join(
+        word if word.isupper() else word.capitalize()
+        for word in str(value).strip().split()
+    )
+
+
+def _matched_keyword_phrases(
+    original_resume_data,
+    job_description,
+    ats_result=None,
+):
+    """Return clean, resume-supported keyword phrases for the Skills section.
+
+    Drops fragments such as "cd" (a piece of "ci cd") and one/two-letter
+    tokens, and returns properly formatted display names.
+    """
+    try:
+        if ats_result:
+            analysis = ats_result
+        else:
+            from app.ats_analyzer import analyze_resume_against_job
+
+            analysis = analyze_resume_against_job(
+                original_resume_data or {},
+                job_description or "",
+            )
+    except Exception:
+        return []
+
+    keywords = analysis.get("keywords", {})
+    matched = keywords.get("matched", []) if isinstance(keywords, dict) else []
+
+    normalized = [_keyword_normalize(k) for k in matched]
+    normalized = [k for k in normalized if k]
+
+    phrases = []
+    seen = set()
+
+    for keyword, key in zip(matched, [_keyword_normalize(k) for k in matched]):
+        if not key:
+            continue
+        if len(key) < 3 and key not in _SHORT_KEYWORDS_ALLOWED:
+            continue
+        # A fragment of a longer matched keyword ("cd" in "ci cd").
+        if " " not in key and any(
+            key in other.split() for other in normalized if other != key and " " in other
+        ):
+            continue
+        canonical = _canonical_keyword(keyword)
+        if canonical in seen:
+            continue
+        seen.add(canonical)
+        phrases.append(_display_keyword(keyword))
+
+    return phrases
+
+
+def _merge_keywords_into_skills(skills, phrases):
+    """Append supported keywords that the skills list does not already cover."""
+    skills = [s for s in (skills or []) if isinstance(s, str) and s.strip()]
+    existing = {_canonical_keyword(skill) for skill in skills}
+    merged = list(skills)
+
+    for phrase in phrases:
+        canonical = _canonical_keyword(phrase)
+        if canonical in existing:
+            continue
+        # Skip near-duplicates such as "Machine Learning" vs "Machine Learning Models".
+        if any(
+            canonical in known.split() or known in canonical.split()
+            for known in existing
+            if known
+        ) and " " not in canonical:
+            continue
+        existing.add(canonical)
+        merged.append(phrase)
+
+    return merged
+
+
+def _skill_key(skill):
+    """Comparison key so 'Neural Network' == 'Neural Networks', 'LLM' == 'Large Language Models'."""
+    key = _canonical_keyword(skill)
+    words = [
+        word[:-1] if len(word) > 3 and word.endswith("s") and not word.endswith("ss") else word
+        for word in key.split()
+    ]
+    return " ".join(words)
+
+
+def _dedupe_skills(skills):
+    seen = set()
+    unique = []
+
+    for skill in skills or []:
+        key = _skill_key(skill)
+        if key and key not in seen:
+            seen.add(key)
+            unique.append(skill)
+
+    return unique
+
+
+# Words that are normal in any resume summary; never evidence of copying.
+_SUMMARY_COMMON_WORDS = {
+    "experience", "skills", "skilled", "ability", "strong", "proven", "hands",
+    "years", "building", "build", "using", "across", "through", "while",
+    "focus", "solutions", "solution", "scalable", "production", "ready",
+    "quality", "performance", "systems", "system", "applications",
+    "application", "develop", "design", "implement", "deliver", "ensure",
+    "enhance", "improve", "support", "working", "team", "teams", "projects",
+    "project", "engineer", "engineering", "models", "model", "data", "tools",
+    "tool", "technologies", "technology", "processes", "process",
+    "processing", "knowledge", "passionate", "driven", "results", "impact",
+    "business", "requirements", "features", "delivery", "environment",
+    "responsible", "responsibilities", "machine", "learning", "generative",
+    "artificial", "intelligence", "python", "analytics", "analysis",
+}
+
+
+def _summary_stem(word):
+    word = word.lower()
+    for suffix in ("ing", "ed", "es", "s"):
+        if word.endswith(suffix) and len(word) - len(suffix) >= 4:
+            word = word[: -len(suffix)]
+            break
+    return word.rstrip("e")
+
+
+def _summary_stems(text):
+    return {
+        _summary_stem(word)
+        for word in re.findall(r"[A-Za-z][A-Za-z-]{4,}", text or "")
+    }
+
+
+_SUMMARY_COMMON_STEMS = {_summary_stem(w) for w in _SUMMARY_COMMON_WORDS}
+
+
+def _job_description_terms_in_summary(summary, resume_text, job_description):
+    """Distinctive summary words that come from the JD but not the resume."""
+    resume_stems = _summary_stems(resume_text)
+    job_stems = _summary_stems(job_description)
+
+    return sorted(
+        stem
+        for stem in _summary_stems(summary)
+        if stem in job_stems
+        and stem not in resume_stems
+        and stem not in _SUMMARY_COMMON_STEMS
+    )
+
+
+def _guard_summary_against_job_description(summary, resume_text, job_description):
+    """Use the candidate's own summary when the rewrite copied the job description.
+
+    A summary is rejected when it contains at least three distinctive terms
+    that appear in the job description but nowhere in the resume.
+    """
+    summary = _normalize_resume_text(summary)
+    leaked = _job_description_terms_in_summary(summary, resume_text, job_description)
+    total = max(len(_summary_stems(summary)), 1)
+
+    if len(leaked) < 3 or len(leaked) / total < 0.15:
+        return summary
+
+    original = _normalize_resume_text(_extract_labeled_summary(resume_text))
+
+    return original or summary
 
 
 DEFAULT_COLLECTION_SECTIONS = (
@@ -182,7 +412,7 @@ def _preserve_supported_keywords(
 
     additions = unique_additions
 
-    if additions:
+    if additions and APPEND_KEYWORDS_TO_SUMMARY:
         if summary and not summary.endswith(
             (".", "!", "?")
         ):
@@ -503,7 +733,7 @@ def _preserve_supported_keywords_in_final_resume(
         seen.add(key)
         additions.append(phrase)
 
-    if additions:
+    if additions and APPEND_KEYWORDS_TO_SUMMARY:
         summary = _normalize_resume_text(
             getattr(final_resume, "summary", "") or ""
         )
@@ -1827,6 +2057,13 @@ def generate_optimized_resume(
         resume_data or {}
     )
 
+    # Parse flat experience/project lines into structured entries once, up
+    # front (idempotent; also covers resume_data supplied by the client).
+    attach_entries(resume_data)
+
+    experience_entries = get_experience_entries(resume_data)
+    project_entries = get_project_entries(resume_data)
+
     ats_result = deepcopy(
         ats_result or {}
     )
@@ -1913,13 +2150,19 @@ def generate_optimized_resume(
         resume_data=resume_data,
         tailoring_plan=tailoring_plan,
         job_description=job_description,
-        experience=resume_data.get(
-            "experience",
-            [],
+        experience=(
+            [entry_to_block(e) for e in experience_entries]
+            or resume_data.get(
+                "experience",
+                [],
+            )
         ),
-        projects=resume_data.get(
-            "projects",
-            [],
+        projects=(
+            [entry_to_block(e) for e in project_entries]
+            or resume_data.get(
+                "projects",
+                [],
+            )
         ),
         skills=resume_data.get(
             "skills",
@@ -1939,6 +2182,37 @@ def generate_optimized_resume(
     )
 
     # -----------------------------------------------------
+    # Structured entries: re-attach rewritten bullets to the
+    # source headers (title/company/dates) by position. This
+    # cannot duplicate, rename, or mix entries.
+    # -----------------------------------------------------
+    if experience_entries:
+        rewritten_sections["experience"] = (
+            merge_rewritten_entries(
+                experience_entries,
+                rewrite_result.get("experience"),
+            )
+        )
+
+    if project_entries:
+        rewritten_sections["projects"] = (
+            merge_rewritten_entries(
+                project_entries,
+                rewrite_result.get("projects"),
+            )
+        )
+
+    # -----------------------------------------------------
+    # Never let job-description text stand in for the
+    # candidate's own summary.
+    # -----------------------------------------------------
+    rewritten_sections["summary"] = _guard_summary_against_job_description(
+        rewritten_sections.get("summary", ""),
+        resume_text,
+        job_description,
+    )
+
+    # -----------------------------------------------------
     # Final project normalization
     # -----------------------------------------------------
     rewritten_sections["projects"] = _normalize_projects(
@@ -1946,9 +2220,12 @@ def generate_optimized_resume(
             "projects",
             [],
         ),
-        original_items=resume_data.get(
-            "projects",
-            [],
+        original_items=(
+            project_entries
+            or resume_data.get(
+                "projects",
+                [],
+            )
         ),
     )
 
@@ -2007,6 +2284,19 @@ def generate_optimized_resume(
             "skills",
             [],
         )
+    )
+
+    # Resume-supported JD keywords belong in Skills, not in the summary.
+    selected_sections["skills"] = _merge_keywords_into_skills(
+        selected_sections["skills"],
+        _matched_keyword_phrases(
+            resume_data,
+            job_description,
+            ats_result if ats_result else None,
+        ),
+    )
+    selected_sections["skills"] = _dedupe_skills(
+        selected_sections["skills"]
     )
 
     # -----------------------------------------------------
