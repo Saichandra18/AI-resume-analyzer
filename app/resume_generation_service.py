@@ -6,6 +6,7 @@ from app.rendered_document_validator import (
 )
 
 from app.resume_document_renderer import render_final_resume
+from app.page_fit import fit_pdf_to_pages
 from app.resume_pdf_renderer import render_final_resume_pdf
 from app.resume_generation_pipeline import generate_optimized_resume
 from app.resume_optimization_evaluator import (
@@ -239,15 +240,26 @@ def generate_optimized_resume_documents(
 
     final_resume = generation_result["final_resume"]
 
+    # Render the PDF first and make it respect the page target (tighter
+    # spacing, then dropping the lowest-priority bullet as a last resort).
+    # The DOCX is rendered from the same, possibly trimmed, resume so both
+    # documents always contain the same content.
+    final_resume, pdf_path, page_fit = fit_pdf_to_pages(
+        final_resume,
+        pdf_output_path,
+        target_pages,
+        template=template,
+        render=render_final_resume_pdf,
+    )
+
+    generation_result = {
+        **generation_result,
+        "final_resume": final_resume,
+    }
+
     document_path = render_final_resume(
         resume=final_resume,
         output_path=docx_output_path,
-        template=template,
-    )
-
-    pdf_path = render_final_resume_pdf(
-        resume=final_resume,
-        output_path=pdf_output_path,
         template=template,
     )
 
@@ -272,5 +284,6 @@ def generate_optimized_resume_documents(
         "pdf_path": pdf_path,
         "ats_evaluation": ats_evaluation,
         "document_validation": document_validation,
+        "page_fit": page_fit,
     }
 

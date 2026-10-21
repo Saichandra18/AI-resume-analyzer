@@ -500,11 +500,29 @@ def _add_collection(story, styles, items):
         )
 
 
+def _compact_template(config):
+    """Copy of a template with slightly tighter vertical spacing.
+
+    Font sizes and line spacing are untouched, so the text stays as
+    readable (and ATS-friendly) as before.
+    """
+    compact = deepcopy(config)
+
+    compact.section_space_before = max(config.section_space_before - 3, 3)
+    compact.section_space_after = max(config.section_space_after - 1, 1)
+    compact.body_space_after = max(config.body_space_after - 1, 1)
+    compact.top_margin = max(config.top_margin - 0.08, 0.4)
+    compact.bottom_margin = max(config.bottom_margin - 0.08, 0.4)
+
+    return compact
+
+
 def render_final_resume_pdf(
     resume,
     output_path,
     validate=True,
     template="default",
+    compact=False,
 ):
     """
     Render a FinalResume to PDF.
@@ -555,6 +573,10 @@ def render_final_resume_pdf(
     resume = deepcopy(resume)
 
     template_config = get_template(template)
+
+    if compact:
+        template_config = _compact_template(template_config)
+
     styles = _build_styles(template_config)
     story = []
 
