@@ -45,3 +45,5 @@ local_proxy/proxy-token.txt
 pytest_test_order.txt
 
 local_proxy/proxy-token.txt
+
+*.patch
