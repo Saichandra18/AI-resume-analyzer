@@ -43,3 +43,5 @@ local_proxy/proxy-token.txt
 
 *.bak
 pytest_test_order.txt
+
+local_proxy/proxy-token.txt
