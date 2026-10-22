@@ -1,0 +1,417 @@
+diff -ruN a/app/jd_tailoring.py b/app/jd_tailoring.py
+--- a/app/jd_tailoring.py	1970-01-01 00:00:00.000000000 +0000
++++ b/app/jd_tailoring.py	2026-10-22 09:44:29.333588875 +0000
+@@ -0,0 +1,128 @@
++"""Deterministic job-description tailoring.
++
++Only the *order* of things the resume already says is changed.  Nothing is
++added, removed or reworded, so this can never introduce a claim the
++candidate did not make - it just puts what matters for this job first.
++
++    * skills the job asks for come first
++    * within each job/project, bullets that match the job come first
++      (so when a page limit forces a trim, the least relevant bullet is the
++      one that goes)
++"""
++
++import logging
++import re
++from copy import deepcopy
++
++from app.section_parser import _FUNCTION_STEMS, text_stems
++
++_LOG = logging.getLogger(__name__)
++
++# Words that appear in nearly every job description and say nothing about
++# what the job needs.
++_GENERIC_WORDS = {
++    "experience", "experienced", "skills", "skill", "ability", "strong",
++    "team", "teams", "work", "working", "build", "building", "develop",
++    "developing", "design", "knowledge", "years", "year", "required",
++    "preferred", "responsible", "responsibilities", "including", "related",
++    "ensure", "support", "great", "good", "excellent", "communication",
++    "environment", "solutions", "solution", "business", "role", "position",
++    "candidate", "company", "engineer", "engineering", "using", "must",
++    "will", "plus", "etc", "other", "new", "high", "quality", "projects",
++    "project", "perform", "write", "help", "apply", "looking", "join",
++}
++_GENERIC_STEMS = {word[:5] for word in _GENERIC_WORDS}
++
++
++def job_stems(job_description, target_job_title=""):
++    """Distinctive word stems the job description asks for."""
++    text = f"{target_job_title or ''} {job_description or ''}"
++    return text_stems(text) - _FUNCTION_STEMS - _GENERIC_STEMS
++
++
++def _phrase(text):
++    return " " + re.sub(r"[^a-z0-9]+", " ", str(text).lower()).strip() + " "
++
++
++def _skill_score(skill, jd_phrase, jd_stems):
++    """2 = the skill (as a phrase) is in the job, 1 = all its words are, 0 = no."""
++    phrase = _phrase(skill)
++
++    if phrase.strip() and phrase in jd_phrase:
++        return 2
++
++    stems = text_stems(skill) - _FUNCTION_STEMS
++
++    if stems and stems <= jd_stems:
++        return 1
++
++    return 0
++
++
++def order_skills(skills, job_description, target_job_title=""):
++    """Put the skills the job asks for first; keep the rest in their order."""
++    skills = [s for s in (skills or []) if isinstance(s, str)]
++
++    if not skills or not (job_description or target_job_title):
++        return skills
++
++    jd_phrase = _phrase(f"{target_job_title or ''} {job_description or ''}")
++    jd_stems = job_stems(job_description, target_job_title)
++
++    scored = [
++        (-_skill_score(skill, jd_phrase, jd_stems), index, skill)
++        for index, skill in enumerate(skills)
++    ]
++    ordered = [skill for _, _, skill in sorted(scored)]
++
++    moved = sum(1 for a, b in zip(skills, ordered) if a != b)
++    if moved:
++        _LOG.info("JD tailoring: reordered skills (%d position(s) changed).", moved)
++
++    return ordered
++
++
++def _relevance(text, jd_stems):
++    return len(text_stems(text) & jd_stems)
++
++
++def order_bullets(bullets, jd_stems):
++    """Most job-relevant bullets first (stable); a leading "Technologies:" line stays first."""
++    bullets = list(bullets or [])
++
++    if len(bullets) < 2 or not jd_stems:
++        return bullets
++
++    head = []
++    if str(bullets[0]).lstrip("\u2022 -").lower().startswith("technologies"):
++        head, bullets = [bullets[0]], bullets[1:]
++
++    scored = [
++        (-_relevance(bullet, jd_stems), index, bullet)
++        for index, bullet in enumerate(bullets)
++    ]
++
++    return head + [bullet for _, _, bullet in sorted(scored)]
++
++
++def order_entry_bullets(entries, job_description, target_job_title=""):
++    """`order_bullets` for every {"bullets": [...]} entry (a reordered copy)."""
++    if not isinstance(entries, list):
++        return entries
++
++    jd_stems = job_stems(job_description, target_job_title)
++    result = []
++    changed = 0
++
++    for entry in entries:
++        if isinstance(entry, dict) and isinstance(entry.get("bullets"), list):
++            entry = deepcopy(entry)
++            ordered = order_bullets(entry["bullets"], jd_stems)
++            changed += ordered != entry["bullets"]
++            entry["bullets"] = ordered
++        result.append(entry)
++
++    if changed:
++        _LOG.info("JD tailoring: reordered bullets in %d entr(ies).", changed)
++
++    return result
+diff -ruN a/app/resume_generation_pipeline.py b/app/resume_generation_pipeline.py
+--- a/app/resume_generation_pipeline.py	2026-10-22 09:44:29.346309445 +0000
++++ b/app/resume_generation_pipeline.py	2026-10-22 09:44:29.343231723 +0000
+@@ -10,6 +10,7 @@
+ from app.resume_content_prioritizer import prioritize_content
+ from app.resume_content_selector import rank_content
+ from app.resume_length_controller import control_resume_length
++from app.jd_tailoring import order_entry_bullets, order_skills
+ from app.resume_rewriter import rewrite_resume
+ from app.summary_rewriter import _extract_labeled_summary
+ from app.resume_section_orderer import order_sections
+@@ -281,6 +282,39 @@
+     if len(leaked) < 3 or len(leaked) / total < 0.15:
+         return summary
+ 
++    # Keep the sentences that are grounded in the resume and drop only the
++    # ones that carry job-description wording the resume never used.
++    sentences = [
++        s.strip() for s in re.split(r"(?<=[.!?])\s+", summary) if s.strip()
++    ]
++    kept = []
++
++    for sentence in sentences:
++        sentence_leaked = _job_description_terms_in_summary(
++            sentence, resume_text, job_description
++        )
++        sentence_total = max(len(_summary_stems(sentence)), 1)
++        if len(sentence_leaked) >= 2 or (
++            sentence_leaked and len(sentence_leaked) / sentence_total >= 0.15
++        ):
++            continue
++        kept.append(sentence)
++
++    candidate = " ".join(kept)
++
++    if (
++        0 < len(kept) < len(sentences)
++        and len(candidate.split()) >= 12
++        and len(
++            _job_description_terms_in_summary(candidate, resume_text, job_description)
++        ) < 3
++    ):
++        _LOG.warning(
++            "Summary: dropped %d sentence(s) with job-description wording; kept the rest.",
++            len(sentences) - len(kept),
++        )
++        return candidate
++
+     _LOG.warning("Summary copied job-description wording; using the resume's own summary.")
+ 
+     return original_summary() or summary
+@@ -2286,6 +2320,20 @@
+         ),
+     )
+ 
++    # Put the bullets that matter for THIS job first. Nothing is added or
++    # reworded; when a page limit forces a trim, the last (least relevant)
++    # bullet is the one that goes.
++    rewritten_sections["experience"] = order_entry_bullets(
++        rewritten_sections.get("experience"),
++        job_description,
++        target_job_title or "",
++    )
++    rewritten_sections["projects"] = order_entry_bullets(
++        rewritten_sections.get("projects"),
++        job_description,
++        target_job_title or "",
++    )
++
+     # -----------------------------------------------------
+     # Content prioritization
+     # -----------------------------------------------------
+@@ -2355,6 +2403,11 @@
+     selected_sections["skills"] = _dedupe_skills(
+         selected_sections["skills"]
+     )
++    selected_sections["skills"] = order_skills(
++        selected_sections["skills"],
++        job_description,
++        target_job_title or "",
++    )
+ 
+     # -----------------------------------------------------
+     # Section relevance
+diff -ruN a/app/section_parser.py b/app/section_parser.py
+--- a/app/section_parser.py	2026-10-22 09:44:29.340075287 +0000
++++ b/app/section_parser.py	2026-10-22 09:44:29.336836923 +0000
+@@ -492,6 +492,11 @@
+     return len(novel) <= MAX_NEW_TERMS
+ 
+ 
++def text_stems(text):
++    """Distinctive word stems (first 5 letters, 3+ letter words) of a text."""
++    return _bullet_stems(text)
++
++
+ def text_similarity(first, second):
+     """Dice similarity (0..1) of the word stems of two texts."""
+     return _similarity(first, second)
+diff -ruN a/tests/test_jd_tailoring.py b/tests/test_jd_tailoring.py
+--- a/tests/test_jd_tailoring.py	1970-01-01 00:00:00.000000000 +0000
++++ b/tests/test_jd_tailoring.py	2026-10-22 09:44:29.349411185 +0000
+@@ -0,0 +1,182 @@
++"""Tests for deterministic job-description tailoring (ordering only)."""
++
++import json
++import re
++
++from app.jd_tailoring import (
++    job_stems,
++    order_bullets,
++    order_entry_bullets,
++    order_skills,
++)
++from app.resume_generation_pipeline import (
++    _guard_summary_against_job_description,
++    generate_optimized_resume,
++)
++from app.resume_structurer import structure_resume
++
++BI_JOB = (
++    "Data Analyst. Build Power BI dashboards and KPI reports, write SQL "
++    "queries, clean and transform data with Python and Pandas, perform "
++    "exploratory data analysis, communicate insights with data visualization."
++)
++LLM_JOB = (
++    "LLM Engineer. Build RAG pipelines, prompt engineering, embeddings, "
++    "evaluate LLM outputs, deploy with Python, PyTorch, CI/CD, Docker."
++)
++SKILLS = [
++    "Python", "Machine Learning", "Deep Learning", "SQL", "Pandas",
++    "Power BI", "TensorFlow", "PyTorch", "NLP", "RAG", "LLM", "CI/CD",
++]
++
++
++def test_skills_the_job_asks_for_come_first():
++    ordered = order_skills(SKILLS, BI_JOB)
++
++    assert set(ordered[:4]) == {"Python", "SQL", "Pandas", "Power BI"}
++    assert sorted(ordered) == sorted(SKILLS)
++
++
++def test_different_jobs_order_the_same_skills_differently():
++    bi = order_skills(SKILLS, BI_JOB)
++    llm = order_skills(SKILLS, LLM_JOB)
++
++    assert bi != llm
++    assert {"RAG", "LLM", "PyTorch", "CI/CD"} <= set(llm[:5])
++    assert llm.index("RAG") < bi.index("RAG")
++
++
++def test_skills_without_a_match_keep_their_original_order():
++    ordered = order_skills(SKILLS, BI_JOB)
++    rest = [s for s in ordered if s not in {"Python", "SQL", "Pandas", "Power BI"}]
++
++    assert rest == [s for s in SKILLS if s in rest]
++
++
++def test_no_job_description_leaves_skills_untouched():
++    assert order_skills(SKILLS, "") == SKILLS
++
++
++def test_most_relevant_bullets_come_first_and_technologies_line_stays_first():
++    bullets = [
++        "Technologies: Python, SQL, Power BI, Pandas.",
++        "Built a chatbot using retrieval augmented generation.",
++        "Designed KPI dashboards in Power BI for match outcomes.",
++        "Automated data cleaning and transformation using Python and SQL.",
++    ]
++
++    ordered = order_bullets(bullets, job_stems(BI_JOB))
++
++    assert ordered[0].startswith("Technologies")
++    assert ordered[-1].startswith("Built a chatbot")
++    assert sorted(ordered) == sorted(bullets)
++
++
++def test_ordering_is_stable_for_equally_relevant_bullets():
++    bullets = ["First thing done.", "Second thing done.", "Third thing done."]
++
++    assert order_bullets(bullets, job_stems(BI_JOB)) == bullets
++
++
++def test_entries_are_reordered_without_losing_or_changing_bullets():
++    entries = [{"title": "P", "bullets": ["Wrote chatbot code.", "Built Power BI dashboards."]}]
++
++    result = order_entry_bullets(entries, BI_JOB)
++
++    assert result[0]["bullets"][0] == "Built Power BI dashboards."
++    assert sorted(result[0]["bullets"]) == sorted(entries[0]["bullets"])
++    assert entries[0]["bullets"][0] == "Wrote chatbot code."  # input untouched
++
++
++# ---------------------------------------------------------------------------
++# End to end: same resume, two jobs
++# ---------------------------------------------------------------------------
++
++RESUME_TEXT = """Test Candidate
++test@example.com +91 9100202628
++Professional Summary
++AI/ML Engineer with hands-on experience in Machine Learning and Generative AI.
++Professional Experience
++Analyst – Acme Jan 2022 – Present
++Remote, India
++•Built chatbot prototypes with retrieval augmented generation for support teams.
++•Designed Power BI dashboards and KPI reports for weekly business reviews.
++•Cleaned and transformed data with Python and Pandas for analysis.
++Core Competencies
++Programming: Python, SQL, Pandas
++Projects
++Sample Project
++• Built dashboards.
++Education
++B.Tech – Computer Science 2019 – 2023
++"""
++
++
++class IdentityClient:
++    def generate(self, prompt):
++        def items(label):
++            m = re.search(label + r":\n(.*?)\n\nORIGINAL RESUME:", prompt, re.S)
++            if not m:
++                return []
++            body = m.group(1).strip()
++            return [p.strip() for p in re.split(r"--- ITEM \d+ ---\n", body) if p.strip()]
++
++        if "existing resume experience content" in prompt:
++            return json.dumps([{"original": i, "rewritten": i, "changes": []} for i in items("EXPERIENCE")])
++        if "existing resume project content" in prompt:
++            return json.dumps([{"original": i, "rewritten": i, "changes": []} for i in items("PROJECTS")])
++        if '"rewritten": "improved summary text"' in prompt:
++            s = "AI/ML Engineer with hands-on experience in Machine Learning and Generative AI."
++            return json.dumps({"original": s, "rewritten": s, "changes": []})
++        if "SKILLS" in prompt:
++            sk = ["Python", "SQL", "Pandas", "Machine Learning"]
++            return json.dumps({"original": sk, "rewritten": sk, "changes": []})
++        return "{}"
++
++
++def _generate(job):
++    return generate_optimized_resume(
++        resume_text=RESUME_TEXT,
++        resume_data=structure_resume(RESUME_TEXT),
++        job_description=job,
++        target_pages=1,
++        client=IdentityClient(),
++    )["final_resume"]
++
++
++def test_experience_bullets_follow_the_job_but_keep_every_bullet():
++    bi = _generate(BI_JOB).experience[0]["bullets"]
++    llm = _generate("Build chatbot and retrieval augmented generation systems for support.").experience[0]["bullets"]
++
++    # The BI job names data cleaning with Python/Pandas, analysis, dashboards
++    # and KPIs; the chatbot bullet matches none of that and goes last.
++    assert bi[0].startswith("Cleaned and transformed data")
++    assert bi[1].startswith("Designed Power BI dashboards")
++    assert bi[-1].startswith("Built chatbot prototypes")
++    assert llm[0].startswith("Built chatbot prototypes")
++    assert sorted(bi) == sorted(llm)
++    assert len(bi) == 3
++
++
++# ---------------------------------------------------------------------------
++# Summary: keep the grounded sentences, drop only the job-description ones
++# ---------------------------------------------------------------------------
++
++JD_WITH_EXTRAS = (
++    "Develop applications utilizing cloud services and image processing "
++    "with Kubernetes orchestration. Machine Learning and Generative AI."
++)
++
++
++def test_summary_keeps_grounded_sentences_and_drops_job_description_ones():
++    summary = (
++        "AI/ML Engineer with hands-on experience in Machine Learning and Generative AI "
++        "across analytics projects and model evaluation work. "
++        "Utilizes cloud services, image processing and Kubernetes orchestration for applications."
++    )
++
++    result = _guard_summary_against_job_description(summary, RESUME_TEXT, JD_WITH_EXTRAS)
++
++    assert result.startswith("AI/ML Engineer with hands-on experience")
++    assert "Kubernetes" not in result
++    assert "cloud services" not in result
