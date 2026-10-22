@@ -204,33 +204,41 @@ def parse_project_entries(lines):
 # ---------------------------------------------------------------------------
 
 def _parse_experience_header(header_lines):
-    title = company = location = dates = ""
-    remaining = []
+    """Parse the lines above a job's bullets into title/company/location/dates.
 
-    for index, line in enumerate(header_lines):
+    Handles the common layouts:
+
+        Title - Company  Sep 2023 - Present  /  Remote, India
+        Title  /  Company | Location | Sep 2023 - Present
+        Title | Company | Sep 2023 - Present
+    """
+    title = company = location = dates = ""
+
+    for line in header_lines:
         match = _RANGE_RE.search(line)
 
         if match and not dates:
             dates = line[match.start():].strip()
             line = line[:match.start()].strip(" \u2013\u2014-|,")
 
-        if not line:
+        parts = [p.strip() for p in re.split(r"\s*\|\s*", line) if p.strip()]
+
+        if not parts:
             continue
 
-        if index == 0 or not (title or company):
-            parts = _TITLE_COMPANY_SPLIT.split(line, maxsplit=1)
-            title = parts[0].strip()
-            if len(parts) > 1:
-                company = parts[1].strip()
-        else:
-            remaining.append(line)
+        if not title:
+            # "Title - Company" / "Title at Company" on the first line.
+            first = _TITLE_COMPANY_SPLIT.split(parts[0], maxsplit=1)
+            title = first[0].strip()
+            if len(first) > 1:
+                company = first[1].strip()
+            parts = parts[1:]
 
-    # First leftover short line is normally the location.
-    for line in remaining:
-        if not location and len(line) <= 60:
-            location = line
-        elif not company:
-            company = line
+        for part in parts:
+            if not company:
+                company = part
+            elif not location and len(part) <= 60:
+                location = part
 
     return {
         "title": title,
