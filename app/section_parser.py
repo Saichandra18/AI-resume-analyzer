@@ -204,53 +204,41 @@ def parse_project_entries(lines):
 # ---------------------------------------------------------------------------
 
 def _parse_experience_header(header_lines):
-    title = company = location = dates = ""
-    remaining = []
+    """Parse the lines above a job's bullets into title/company/location/dates.
 
-    for index, line in enumerate(header_lines):
+    Handles the common layouts:
+
+        Title - Company  Sep 2023 - Present  /  Remote, India
+        Title  /  Company | Location | Sep 2023 - Present
+        Title | Company | Sep 2023 - Present
+    """
+    title = company = location = dates = ""
+
+    for line in header_lines:
         match = _RANGE_RE.search(line)
 
         if match and not dates:
             dates = line[match.start():].strip()
             line = line[:match.start()].strip(" \u2013\u2014-|,")
 
-        if not line:
+        parts = [p.strip() for p in re.split(r"\s*\|\s*", line) if p.strip()]
+
+        if not parts:
             continue
 
-        if index == 0 or not (title or company):
-            parts = _TITLE_COMPANY_SPLIT.split(line, maxsplit=1)
-            title = parts[0].strip()
-            if len(parts) > 1:
-                company = parts[1].strip()
-        else:
-            remaining.append(line)
+        if not title:
+            # "Title - Company" / "Title at Company" on the first line.
+            first = _TITLE_COMPANY_SPLIT.split(parts[0], maxsplit=1)
+            title = first[0].strip()
+            if len(first) > 1:
+                company = first[1].strip()
+            parts = parts[1:]
 
-    # A common PDF layout puts employer, location, and dates on a
-    # separate pipe-delimited line beneath the role title, e.g.
-    # "Outlier | Remote, India | Sep 2023 – Present". The date range
-    # has already been removed above; parse the remaining fields instead
-    # of incorrectly assigning the entire line to location.
-    for line in remaining:
-        pipe_parts = [part.strip(" ,|") for part in line.split("|")]
-        pipe_parts = [part for part in pipe_parts if part]
-
-        if len(pipe_parts) >= 2:
+        for part in parts:
             if not company:
-                company = pipe_parts[0]
-            if not location:
-                location = pipe_parts[1]
-            for extra in pipe_parts[2:]:
-                if not company:
-                    company = extra
-                elif not location:
-                    location = extra
-            continue
-
-        # First leftover short line is normally the location.
-        if not location and len(line) <= 60:
-            location = line
-        elif not company:
-            company = line
+                company = part
+            elif not location and len(part) <= 60:
+                location = part
 
     return {
         "title": title,
@@ -448,13 +436,90 @@ def _similarity(first, second):
     return 2 * len(a & b) / (len(a) + len(b))
 
 
-def _align_bullets(source_bullets, candidates):
+# ---------------------------------------------------------------------------
+# Faithfulness: a rewrite may not add claims the source entry does not make
+# ---------------------------------------------------------------------------
+
+# A rewrite may introduce at most this many new content words (verb swaps
+# such as "Performed" -> "Carried out" are fine; whole new claims are not).
+MAX_NEW_TERMS = 2
+
+_FUNCTION_WORDS = {
+    "and", "the", "for", "with", "also", "while", "that", "this", "from",
+    "into", "using", "use", "used", "its", "their", "through", "across",
+    "such", "per", "via", "are", "was", "were", "has", "have", "had", "not",
+    "but", "all", "any", "can", "our", "out", "over", "under", "between",
+    "within", "both", "of", "to", "in", "on", "by", "as", "at", "an", "or",
+}
+_FUNCTION_STEMS = {word[:_STEM_LENGTH] for word in _FUNCTION_WORDS}
+
+# Claims of leading or owning work must already be in the source entry.
+_OWNERSHIP_VERBS = {
+    "managed", "manage", "led", "lead", "owned", "directed", "spearheaded",
+    "oversaw", "headed", "architected", "orchestrated",
+}
+_WEAK_OPENERS = {
+    "contributed", "assisted", "supported", "helped", "participated", "aided",
+}
+_STRONG_OPENERS = {
+    "developed", "built", "led", "designed", "architected", "created",
+    "implemented", "engineered", "managed", "owned", "spearheaded",
+    "delivered", "launched", "established",
+}
+
+
+def _words(text):
+    return re.findall(r"[a-z][a-z-]*", str(text).lower())
+
+
+def is_faithful_rewrite(rewritten, source_bullet, entry_text):
+    """True when `rewritten` makes no claim the source entry does not make.
+
+    Rejects: a weak opener upgraded to a strong one ("Contributed" ->
+    "Developed"), new ownership claims ("managed"), and rewrites that add
+    more than MAX_NEW_TERMS content words absent from the whole source entry
+    ("... and automated detection tools").
+    """
+    new_words = _words(rewritten)
+    source_words = _words(source_bullet)
+    entry_words = set(_words(entry_text))
+
+    if new_words and source_words:
+        if source_words[0] in _WEAK_OPENERS and new_words[0] in _STRONG_OPENERS:
+            return False
+
+    if {w for w in new_words if w in _OWNERSHIP_VERBS} - entry_words:
+        return False
+
+    novel = (
+        _bullet_stems(rewritten)
+        - _bullet_stems(entry_text)
+        - _FUNCTION_STEMS
+    )
+
+    return len(novel) <= MAX_NEW_TERMS
+
+
+def text_stems(text):
+    """Distinctive word stems (first 5 letters, 3+ letter words) of a text."""
+    return _bullet_stems(text)
+
+
+def text_similarity(first, second):
+    """Dice similarity (0..1) of the word stems of two texts."""
+    return _similarity(first, second)
+
+
+def _align_bullets(source_bullets, candidates, entry_text=""):
     """Pair each source bullet with its best-matching rewritten bullet.
 
     The result always has exactly one bullet per source bullet: the rewrite
     when one clearly corresponds to it, otherwise the source bullet itself.
     Rewritten bullets that match nothing (for example project bullets a
     model wandered into a job's answer) are ignored.
+
+    A matched rewrite is used only if it is faithful to the source entry
+    (see `is_faithful_rewrite`); otherwise the source bullet is kept.
 
     Returns (bullets, ignored_rewrites, kept_source_bullets).
     """
@@ -474,8 +539,12 @@ def _align_bullets(source_bullets, candidates):
             break
         if i in chosen or j in used:
             continue
-        chosen[i] = candidates[j]
         used.add(j)
+        if entry_text and not is_faithful_rewrite(
+            candidates[j], source_bullets[i], entry_text
+        ):
+            continue
+        chosen[i] = candidates[j]
 
     bullets = [chosen.get(i, source) for i, source in enumerate(source_bullets)]
 
@@ -568,9 +637,14 @@ def merge_rewritten_entries(source_entries, rewritten_items):
                 candidates = _bullets_from_rewrite(joined, source)
 
                 if candidates and source_bullets:
+                    entry_text = " ".join(
+                        [str(source.get("title", "")), str(source.get("company", ""))]
+                        + source_bullets
+                    )
                     bullets, ignored, kept = _align_bullets(
                         source_bullets,
                         candidates,
+                        entry_text,
                     )
 
                     if ignored or kept:
