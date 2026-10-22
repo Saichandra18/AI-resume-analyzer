@@ -59,9 +59,23 @@ def rewrite_summary(
         return build_rewrite_output()
 
     client = client or create_llm_provider()
+    source_summary = _extract_labeled_summary(resume_text)
+
+    if source_summary:
+        summary_task = """Rewrite the explicitly labeled professional summary only.
+Do not replace it with a description of one project. Do not return an empty
+result when this section exists and contains text."""
+    else:
+        summary_task = """Create a concise professional profile from the whole resume because no
+explicit summary section exists. Synthesize the candidate's actual skills, experience, and project work.
+Do not describe only one project as if it were
+the candidate's professional summary. Do not claim professional experience,
+model deployment, production ownership, leadership, or proficiency unless the
+resume explicitly supports that claim. If the resume does not support a fact,
+leave it out."""
 
     prompt = f"""
-Rewrite the existing professional summary from the resume below.
+{summary_task}
 
 ORIGINAL RESUME:
 {resume_text}
@@ -77,22 +91,21 @@ TARGET JOB DESCRIPTION:
 
 TASK:
 
-1. Identify the existing professional summary in the resume.
-2. Check explicitly for a section headed PROFESSIONAL SUMMARY,
-   PROFESSIONAL PROFILE, or SUMMARY.
-3. If one of these sections exists and contains text, rewrite that text.
-4. Extract the summary from the section rather than guessing whether
-   a summary exists.
-5. Do not return an empty result when this section exists and contains
-   text.
-6. Return an empty result only when no existing professional summary
-   can be identified.
-7. Do not create a new summary from information that is not already
-   present in the resume.
+1. Use the explicitly labeled summary when one exists.
+2. If no labeled summary exists, create a concise candidate profile using
+   information across the resume: skills, experience, and projects.
+3. Do not let a single project dominate the profile unless the resume has
+   no other relevant information.
+4. Do not return an empty result when the resume supports a concise profile.
+5. Do not create facts that are not present in the resume.
+6. Do not return an empty result when a labeled summary exists and contains text.
 
 RULES:
 
-- Preserve the original meaning.
+- Preserve the original meaning when rewriting an existing summary.
+- For a newly created profile, synthesize only facts supported by the full resume.
+- Mention the candidate's broader technical profile rather than merely describing
+  the features of one project.
 - Preserve all factual information.
 - Do not invent skills.
 - Do not invent technologies.
@@ -116,10 +129,12 @@ Return exactly one object:
     ]
 }}
 
-If no professional summary exists, return:
+If no professional summary exists and the resume does not contain enough
+information to create a grounded candidate profile, return:
 
 {{}}
 
+Otherwise, return the grounded candidate profile object above.
 Return only JSON-compatible data.
 """
 

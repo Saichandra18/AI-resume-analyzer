@@ -3,7 +3,20 @@ from app.ai.providers import LLMProvider
 from app.rewrite_models import build_rewrite_output
 import json
 from app.rewrite_validator import validate_rewrite
-from app.section_parser import format_items_for_prompt
+from app.section_parser import entry_to_block, format_items_for_prompt
+
+
+def _source_experience_text(item):
+    """Serialize trusted input for one experience item, never model output."""
+    if isinstance(item, str):
+        return item.strip()
+    if isinstance(item, dict):
+        if isinstance(item.get("text"), str):
+            return item["text"].strip()
+        if any(key in item for key in ("title", "company", "location", "dates", "bullets")):
+            return entry_to_block(item)
+        return json.dumps(item, ensure_ascii=False, sort_keys=True)
+    return str(item).strip() if item is not None else ""
 
 
 def rewrite_experience(
@@ -15,6 +28,14 @@ def rewrite_experience(
     client=None,
 ):
     """Rewrite existing resume experience content using AI."""
+
+    
+    # Normalize legacy dictionary-shaped experience data to a list.
+    if isinstance(experience, dict):
+        experience = [experience]
+    elif not isinstance(experience, list):
+        experience = []
+
 
     if not experience:
         return build_rewrite_output()
@@ -47,6 +68,11 @@ RULES:
 - Do not invent technologies or skills.
 - Do not invent achievements.
 - Do not invent metrics or numbers.
+- Do not upgrade annotation, review, or evaluation work into developing
+  pipelines, deploying models, managing systems, or owning production work
+  unless the original experience item explicitly says so.
+- Keep each responsibility within the scope of the supplied experience item;
+  another project elsewhere in the resume is not evidence that this job included it.
 - Use job-description terminology only when supported by the
   original resume.
 - Improve clarity, professionalism, and impact.
@@ -98,7 +124,7 @@ Return only JSON-compatible data.
     all_unsupported_claims = []
     all_grounded = True
 
-    for item in parsed_response:
+    for index, item in enumerate(parsed_response):
         if not isinstance(item, dict):
             all_grounded = False
             all_unsupported_claims.append(
@@ -106,13 +132,24 @@ Return only JSON-compatible data.
             )
             continue
 
-        original = item.get("original", "")
+        # The model's "original" field is untrusted. Anchor validation to the
+        # actual source item at the same position so it cannot fabricate an
+        # original statement to justify a stronger rewrite.
+        original = (
+            _source_experience_text(experience[index])
+            if index < len(experience)
+            else ""
+        )
         rewritten = item.get("rewritten", "")
+        item["original"] = original
 
+        # Validate experience claims against this experience item, not the
+        # entire resume. Project experience must not be used to substantiate
+        # responsibilities attributed to an employer or role.
         validation = validate_rewrite(
             original,
             rewritten,
-            evidence_text=resume_text,
+            evidence_text=original,
         )
 
         item["validation"] = validation

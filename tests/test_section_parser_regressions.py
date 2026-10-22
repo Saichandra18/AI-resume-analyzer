@@ -54,3 +54,20 @@ def test_empty_project_input_returns_empty_list():
 
 def test_empty_experience_input_returns_empty_list():
     assert parse_experience_entries([]) == []
+
+
+def test_experience_header_parses_company_location_and_dates_on_second_line():
+    entries = parse_experience_entries([
+        "Freelance LLM Trainer",
+        "Outlier | Remote, India | Sep 2023 – Present",
+        "• Evaluated prompts and analyzed model outputs.",
+    ])
+
+    assert len(entries) == 1
+    assert entries[0]["title"] == "Freelance LLM Trainer"
+    assert entries[0]["company"] == "Outlier"
+    assert entries[0]["location"] == "Remote, India"
+    assert entries[0]["dates"] == "Sep 2023 – Present"
+    assert entries[0]["bullets"] == [
+        "Evaluated prompts and analyzed model outputs."
+    ]

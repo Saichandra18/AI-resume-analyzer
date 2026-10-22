@@ -72,6 +72,7 @@ def fit_pdf_to_pages(
         "compact_spacing": False,
         "trimmed": [],
         "actual_pages": None,
+        "fits": None,
     }
 
     path = render(resume=resume, output_path=pdf_path, template=template)
@@ -86,6 +87,8 @@ def fit_pdf_to_pages(
             compact=True,
         )
         pages = count_pages(path)
+
+    compact_resume = resume
 
     while pages > target_pages and len(report["trimmed"]) < max_trims:
         trimmed, info = trim_one_bullet(resume)
@@ -103,7 +106,22 @@ def fit_pdf_to_pages(
         )
         pages = count_pages(path)
 
+    # Dropping bullets is only worth it if it reaches the target.  Otherwise
+    # the user would lose content *and* still miss the page goal, so restore
+    # the full content and report the real page count instead.
+    if pages > target_pages and report["trimmed"]:
+        resume = compact_resume
+        report["trimmed"] = []
+        path = render(
+            resume=resume,
+            output_path=pdf_path,
+            template=template,
+            compact=True,
+        )
+        pages = count_pages(path)
+
     report["actual_pages"] = pages
+    report["fits"] = pages <= target_pages
 
     if report["compact_spacing"] or report["trimmed"]:
         _LOG.warning(

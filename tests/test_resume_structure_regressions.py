@@ -124,14 +124,15 @@ def _generate():
 def test_wrapped_bullet_is_joined_not_split():
     entries = parse_project_entries([
         "AI Resume Analyzer",
-        "•Implemented testing to ensure accuracy, consistency, and "
-        "backward ........................",
+        "•Implemented testing to ensure accuracy, consistency, and backward",
         "compatibility.",
     ])
 
     assert len(entries) == 1
     assert len(entries[0]["bullets"]) == 1
-    assert entries[0]["bullets"][0].endswith("backward ........................ compatibility.")
+    assert entries[0]["bullets"] == [
+        "Implemented testing to ensure accuracy, consistency, and backward compatibility."
+    ]
 
 
 def test_hyphenated_line_break_is_repaired():
@@ -534,3 +535,77 @@ def test_real_hyphenated_compounds_are_left_alone():
     assert hyphen_join("Retrieval-", "Augmented") == "Retrieval-Augmented"
     assert hyphen_join("AI-", "powered") == "AI-powered"
     assert hyphen_join("role-", "specific") == "role-specific"
+
+
+# ---------------------------------------------------------------------------
+# Fourth round: project bullets leaking into Experience
+# ---------------------------------------------------------------------------
+
+
+class LeakyExperienceClient(IdentityClient):
+    """Answers the EXPERIENCE request with one item per bullet, including
+    bullets from the projects it can see elsewhere in the resume."""
+
+    def generate(self, prompt):
+        if "existing resume experience content" in prompt:
+            data = structure_resume(RESUME_TEXT)
+            bullets = [b for e in data["experience"]["entries"] for b in e["bullets"]]
+            bullets += [b for p in data["project_entries"] for b in p["bullets"]]
+            return json.dumps([
+                {"original": b, "rewritten": b, "changes": []} for b in bullets
+            ])
+        return super().generate(prompt)
+
+
+def test_unrelated_extra_rewritten_bullets_are_ignored():
+    source = [{
+        "title": "Trainer",
+        "company": "Outlier",
+        "bullets": [
+            "Annotated training data for large language models.",
+            "Evaluated prompts and analyzed model outputs.",
+            "Identified hallucinations and bias in generated content.",
+        ],
+    }]
+    items = [
+        {"rewritten": "\u2022 Conducted annotation of training data for large language models."},
+        {"rewritten": "\u2022 Evaluated prompts and analyzed outputs of the model."},
+        {"rewritten": "\u2022 Detected hallucinations and bias in generated content."},
+        {"rewritten": "\u2022 Built an interactive cricket analytics dashboard in Power BI."},
+        {"rewritten": "\u2022 Developed a chatbot with embedding based semantic search."},
+    ]
+
+    merged = merge_rewritten_entries(source, items)
+
+    assert len(merged[0]["bullets"]) == 3
+    assert merged[0]["bullets"][0].startswith("Conducted annotation")
+    assert not any("cricket" in b.lower() or "chatbot" in b.lower() for b in merged[0]["bullets"])
+
+
+def test_source_bullets_without_a_matching_rewrite_are_kept_as_written():
+    source = [{
+        "title": "Trainer",
+        "bullets": [
+            "Annotated training data for large language models.",
+            "Maintained productivity benchmarks under defined SLAs.",
+        ],
+    }]
+    items = [{"rewritten": "\u2022 Conducted annotation of training data for large language models."}]
+
+    merged = merge_rewritten_entries(source, items)
+
+    assert merged[0]["bullets"] == [
+        "Conducted annotation of training data for large language models.",
+        "Maintained productivity benchmarks under defined SLAs.",
+    ]
+
+
+def test_experience_does_not_absorb_project_bullets():
+    resume = _generate_with(LeakyExperienceClient())
+
+    assert len(resume.experience[0]["bullets"]) == 3
+    assert [len(p["bullets"]) for p in resume.projects] == [2, 2, 2]
+    assert not any(
+        "analytics dashboard" in b or "chatbot" in b.lower()
+        for b in resume.experience[0]["bullets"]
+    )

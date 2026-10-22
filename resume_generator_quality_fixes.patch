@@ -1,0 +1,340 @@
+--- a/app/section_parser.py
++++ b/app/section_parser.py
+@@ -170,8 +170,28 @@
+         else:
+             remaining.append(line)
+ 
+-    # First leftover short line is normally the location.
++    # A common PDF layout puts employer, location, and dates on a
++    # separate pipe-delimited line beneath the role title, e.g.
++    # "Outlier | Remote, India | Sep 2023 – Present". The date range
++    # has already been removed above; parse the remaining fields instead
++    # of incorrectly assigning the entire line to location.
+     for line in remaining:
++        pipe_parts = [part.strip(" ,|") for part in line.split("|")]
++        pipe_parts = [part for part in pipe_parts if part]
++
++        if len(pipe_parts) >= 2:
++            if not company:
++                company = pipe_parts[0]
++            if not location:
++                location = pipe_parts[1]
++            for extra in pipe_parts[2:]:
++                if not company:
++                    company = extra
++                elif not location:
++                    location = extra
++            continue
++
++        # First leftover short line is normally the location.
+         if not location and len(line) <= 60:
+             location = line
+         elif not company:
+--- a/app/summary_rewriter.py
++++ b/app/summary_rewriter.py
+@@ -59,9 +59,23 @@
+         return build_rewrite_output()
+ 
+     client = client or create_llm_provider()
++    source_summary = _extract_labeled_summary(resume_text)
++
++    if source_summary:
++        summary_task = """Rewrite the explicitly labeled professional summary only.
++Do not replace it with a description of one project. Do not return an empty
++result when this section exists and contains text."""
++    else:
++        summary_task = """Create a concise professional profile from the whole resume because no
++explicit summary section exists. Synthesize the candidate's actual skills, experience, and project work.
++Do not describe only one project as if it were
++the candidate's professional summary. Do not claim professional experience,
++model deployment, production ownership, leadership, or proficiency unless the
++resume explicitly supports that claim. If the resume does not support a fact,
++leave it out."""
+ 
+     prompt = f"""
+-Rewrite the existing professional summary from the resume below.
++{summary_task}
+ 
+ ORIGINAL RESUME:
+ {resume_text}
+@@ -77,22 +91,21 @@
+ 
+ TASK:
+ 
+-1. Identify the existing professional summary in the resume.
+-2. Check explicitly for a section headed PROFESSIONAL SUMMARY,
+-   PROFESSIONAL PROFILE, or SUMMARY.
+-3. If one of these sections exists and contains text, rewrite that text.
+-4. Extract the summary from the section rather than guessing whether
+-   a summary exists.
+-5. Do not return an empty result when this section exists and contains
+-   text.
+-6. Return an empty result only when no existing professional summary
+-   can be identified.
+-7. Do not create a new summary from information that is not already
+-   present in the resume.
++1. Use the explicitly labeled summary when one exists.
++2. If no labeled summary exists, create a concise candidate profile using
++   information across the resume: skills, experience, and projects.
++3. Do not let a single project dominate the profile unless the resume has
++   no other relevant information.
++4. Do not return an empty result when the resume supports a concise profile.
++5. Do not create facts that are not present in the resume.
++6. Do not return an empty result when a labeled summary exists and contains text.
+ 
+ RULES:
+ 
+-- Preserve the original meaning.
++- Preserve the original meaning when rewriting an existing summary.
++- For a newly created profile, synthesize only facts supported by the full resume.
++- Mention the candidate's broader technical profile rather than merely describing
++  the features of one project.
+ - Preserve all factual information.
+ - Do not invent skills.
+ - Do not invent technologies.
+@@ -115,10 +128,12 @@
+     ]
+ }}
+ 
+-If no professional summary exists, return:
++If no professional summary exists and the resume does not contain enough
++information to create a grounded candidate profile, return:
+ 
+ {{}}
+ 
++Otherwise, return the grounded candidate profile object above.
+ Return only JSON-compatible data.
+ """
+ 
+--- a/app/experience_rewriter.py
++++ b/app/experience_rewriter.py
+@@ -3,7 +3,20 @@
+ from app.rewrite_models import build_rewrite_output
+ import json
+ from app.rewrite_validator import validate_rewrite
+-from app.section_parser import format_items_for_prompt
++from app.section_parser import entry_to_block, format_items_for_prompt
++
++
++def _source_experience_text(item):
++    """Serialize trusted input for one experience item, never model output."""
++    if isinstance(item, str):
++        return item.strip()
++    if isinstance(item, dict):
++        if isinstance(item.get("text"), str):
++            return item["text"].strip()
++        if any(key in item for key in ("title", "company", "location", "dates", "bullets")):
++            return entry_to_block(item)
++        return json.dumps(item, ensure_ascii=False, sort_keys=True)
++    return str(item).strip() if item is not None else ""
+ 
+ 
+ def rewrite_experience(
+@@ -47,6 +60,11 @@
+ - Do not invent technologies or skills.
+ - Do not invent achievements.
+ - Do not invent metrics or numbers.
++- Do not upgrade annotation, review, or evaluation work into developing
++  pipelines, deploying models, managing systems, or owning production work
++  unless the original experience item explicitly says so.
++- Keep each responsibility within the scope of the supplied experience item;
++  another project elsewhere in the resume is not evidence that this job included it.
+ - Use job-description terminology only when supported by the
+   original resume.
+ - Improve clarity, professionalism, and impact.
+@@ -97,7 +115,7 @@
+     all_unsupported_claims = []
+     all_grounded = True
+ 
+-    for item in parsed_response:
++    for index, item in enumerate(parsed_response):
+         if not isinstance(item, dict):
+             all_grounded = False
+             all_unsupported_claims.append(
+@@ -105,13 +123,24 @@
+             )
+             continue
+ 
+-        original = item.get("original", "")
++        # The model's "original" field is untrusted. Anchor validation to the
++        # actual source item at the same position so it cannot fabricate an
++        # original statement to justify a stronger rewrite.
++        original = (
++            _source_experience_text(experience[index])
++            if index < len(experience)
++            else ""
++        )
+         rewritten = item.get("rewritten", "")
++        item["original"] = original
+ 
++        # Validate experience claims against this experience item, not the
++        # entire resume. Project experience must not be used to substantiate
++        # responsibilities attributed to an employer or role.
+         validation = validate_rewrite(
+             original,
+             rewritten,
+-            evidence_text=resume_text,
++            evidence_text=original,
+         )
+ 
+         item["validation"] = validation
+--- a/app/rewrite_validator.py
++++ b/app/rewrite_validator.py
+@@ -89,6 +89,12 @@
+         "jenkins",
+         "github actions",
+         "terraform",
++        "pipeline",
++        "pipelines",
++        "deployment",
++        "deployments",
++        "production environment",
++        "production environments",
+     }
+ 
+     normalized = _normalize_text(text)
+@@ -171,6 +177,13 @@
+         "delivered",
+         "led",
+         "drove",
++        "maintained",
++        "implemented",
++        "managed",
++        "deployed",
++        "automated",
++        "designed",
++        "architected",
+     }
+     strengthening_phrases = {
+         "consistently met",
+--- a/app/project_rewriter.py
++++ b/app/project_rewriter.py
+@@ -200,6 +200,9 @@
+ - Return the title on the first line of each rewritten project.
+ - Put each project bullet on a separate line.
+ - Preserve all factual details from that project's original bullets.
++- If a project has a dedicated "Technologies:" bullet, do not repeat the
++  entire technology list in another bullet. Use the remaining bullet to explain
++  what was built or analyzed, without inventing outcomes.
+ 
+ Return one rewritten item for each original project item.
+ 
+--- a/tests/test_resume_structure_regressions.py
++++ b/tests/test_resume_structure_regressions.py
+@@ -124,14 +124,15 @@
+ def test_wrapped_bullet_is_joined_not_split():
+     entries = parse_project_entries([
+         "AI Resume Analyzer",
+-        "•Implemented testing to ensure accuracy, consistency, and "
+-        "backward ........................",
++        "•Implemented testing to ensure accuracy, consistency, and backward",
+         "compatibility.",
+     ])
+ 
+     assert len(entries) == 1
+     assert len(entries[0]["bullets"]) == 1
+-    assert entries[0]["bullets"][0].endswith("backward ........................ compatibility.")
++    assert entries[0]["bullets"] == [
++        "Implemented testing to ensure accuracy, consistency, and backward compatibility."
++    ]
+ 
+ 
+ def test_hyphenated_line_break_is_repaired():
+--- a/tests/test_summary_rewriter.py
++++ b/tests/test_summary_rewriter.py
+@@ -259,3 +259,28 @@
+     assert client.calls == 2
+     assert result["summary"]["rewritten"]
+     assert result["summary"]["original"].startswith("Entry-level")
++
++
++def test_missing_summary_prompt_builds_a_candidate_profile_not_a_project_blurb():
++    class CapturingClient:
++        def __init__(self):
++            self.prompt = ""
++
++        def generate(self, prompt):
++            self.prompt = prompt
++            return "{}"
++
++    client = CapturingClient()
++    rewrite_summary(
++        resume_text=(
++            "Skills\nPython, SQL, RAG\nExperience\n"
++            "LLM Trainer\nReviewed model outputs.\nProjects\n"
++            "Built a resume analyzer using Flask."
++        ),
++        client=client,
++    )
++
++    prompt = client.prompt.lower()
++    assert "create a concise professional profile from the whole resume" in prompt
++    assert "do not describe only one project" in prompt
++    assert "skills, experience, and project work" in prompt
+--- a/tests/test_experience_rewriter.py
++++ b/tests/test_experience_rewriter.py
+@@ -306,7 +306,7 @@
+     )
+     assert result["experience"][0]["validation"]["meaning_preserved"] is False
+ 
+-def test_rewrite_experience_accepts_claim_strengthening_supported_by_resume():
++def test_rewrite_experience_does_not_borrow_claims_from_unrelated_resume_sections():
+     class JSONClient:
+         def generate(self, prompt):
+             return (
+@@ -333,5 +333,29 @@
+     )
+ 
+     assert result["experience"][0]["validation"]["grounding_status"] == (
+-        "grounded"
+-    )
+\ No newline at end of file
++        "needs_review"
++    )
++
++def test_rewrite_experience_does_not_borrow_project_evidence_for_pipeline_claims():
++    class JSONClient:
++        def generate(self, prompt):
++            return (
++                '[{"original": "Developed and maintained LLM pipelines for training, evaluation, and deployment.", '
++                '"rewritten": "Developed and maintained LLM pipelines for training, evaluation, and deployment.", '
++                '"changes": ["Added stronger wording."]}]'
++            )
++
++    result = rewrite_experience(
++        experience=["Reviewed LLM responses and annotated data."],
++        resume_text=(
++            "Reviewed LLM responses and annotated data. "
++            "Project: developed a Flask resume analyzer."
++        ),
++        client=JSONClient(),
++    )
++
++    validation = result["experience"][0]["validation"]
++    assert validation["grounding_status"] == "needs_review"
++    assert any("maintained" in claim for claim in validation["unsupported_claims"])
++    assert any("pipeline" in claim for claim in validation["unsupported_claims"])
++    assert any("deployment" in claim for claim in validation["unsupported_claims"])
+--- a/tests/test_section_parser_regressions.py
++++ b/tests/test_section_parser_regressions.py
+@@ -54,3 +54,20 @@
+ 
+ def test_empty_experience_input_returns_empty_list():
+     assert parse_experience_entries([]) == []
++
++
++def test_experience_header_parses_company_location_and_dates_on_second_line():
++    entries = parse_experience_entries([
++        "Freelance LLM Trainer",
++        "Outlier | Remote, India | Sep 2023 – Present",
++        "• Evaluated prompts and analyzed model outputs.",
++    ])
++
++    assert len(entries) == 1
++    assert entries[0]["title"] == "Freelance LLM Trainer"
++    assert entries[0]["company"] == "Outlier"
++    assert entries[0]["location"] == "Remote, India"
++    assert entries[0]["dates"] == "Sep 2023 – Present"
++    assert entries[0]["bullets"] == [
++        "Evaluated prompts and analyzed model outputs."
++    ]

@@ -139,8 +139,22 @@ def test_gives_up_gracefully_when_nothing_more_can_be_trimmed():
     )
 
     assert report["actual_pages"] == 2
+    assert report["fits"] is False
     assert all(len(p["bullets"]) >= MIN_PROJECT_BULLETS for p in resume.projects)
     assert len(resume.experience[0]["bullets"]) >= MIN_JOB_BULLETS
+
+
+def test_no_bullets_are_dropped_when_trimming_cannot_reach_the_target():
+    original = _resume()
+    fake = FakeRenderer(bullets_needed=0)  # can never fit, however much is trimmed
+
+    resume, _, report = fit_pdf_to_pages(
+        original, "x.pdf", 1, render=fake.render, count_pages=fake.count
+    )
+
+    assert report["trimmed"] == []
+    assert [p["bullets"] for p in resume.projects] == [p["bullets"] for p in original.projects]
+    assert resume.experience[0]["bullets"] == original.experience[0]["bullets"]
 
 
 # ---------------------------------------------------------------------------

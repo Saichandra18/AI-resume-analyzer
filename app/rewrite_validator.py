@@ -89,6 +89,12 @@ def _extract_technical_terms(text):
         "jenkins",
         "github actions",
         "terraform",
+        "pipeline",
+        "pipelines",
+        "deployment",
+        "deployments",
+        "production environment",
+        "production environments",
     }
 
     normalized = _normalize_text(text)
@@ -171,6 +177,13 @@ def _detect_unsupported_claim_strengthening(
         "delivered",
         "led",
         "drove",
+        "maintained",
+        "implemented",
+        "managed",
+        "deployed",
+        "automated",
+        "designed",
+        "architected",
     }
     strengthening_phrases = {
         "consistently met",

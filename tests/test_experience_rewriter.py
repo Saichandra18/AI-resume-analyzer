@@ -306,7 +306,7 @@ def test_rewrite_experience_detects_unsupported_achievement_claim():
     )
     assert result["experience"][0]["validation"]["meaning_preserved"] is False
 
-def test_rewrite_experience_accepts_claim_strengthening_supported_by_resume():
+def test_rewrite_experience_does_not_borrow_claims_from_unrelated_resume_sections():
     class JSONClient:
         def generate(self, prompt):
             return (
@@ -333,5 +333,29 @@ def test_rewrite_experience_accepts_claim_strengthening_supported_by_resume():
     )
 
     assert result["experience"][0]["validation"]["grounding_status"] == (
-        "grounded"
+        "needs_review"
     )
+
+def test_rewrite_experience_does_not_borrow_project_evidence_for_pipeline_claims():
+    class JSONClient:
+        def generate(self, prompt):
+            return (
+                '[{"original": "Developed and maintained LLM pipelines for training, evaluation, and deployment.", '
+                '"rewritten": "Developed and maintained LLM pipelines for training, evaluation, and deployment.", '
+                '"changes": ["Added stronger wording."]}]'
+            )
+
+    result = rewrite_experience(
+        experience=["Reviewed LLM responses and annotated data."],
+        resume_text=(
+            "Reviewed LLM responses and annotated data. "
+            "Project: developed a Flask resume analyzer."
+        ),
+        client=JSONClient(),
+    )
+
+    validation = result["experience"][0]["validation"]
+    assert validation["grounding_status"] == "needs_review"
+    assert any("maintained" in claim for claim in validation["unsupported_claims"])
+    assert any("pipeline" in claim for claim in validation["unsupported_claims"])
+    assert any("deployment" in claim for claim in validation["unsupported_claims"])

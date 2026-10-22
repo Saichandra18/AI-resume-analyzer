@@ -14,7 +14,6 @@ duplicate, reorder, rename or mix entries.
 """
 
 import logging
-import math
 import re
 from copy import deepcopy
 
@@ -226,8 +225,28 @@ def _parse_experience_header(header_lines):
         else:
             remaining.append(line)
 
-    # First leftover short line is normally the location.
+    # A common PDF layout puts employer, location, and dates on a
+    # separate pipe-delimited line beneath the role title, e.g.
+    # "Outlier | Remote, India | Sep 2023 – Present". The date range
+    # has already been removed above; parse the remaining fields instead
+    # of incorrectly assigning the entire line to location.
     for line in remaining:
+        pipe_parts = [part.strip(" ,|") for part in line.split("|")]
+        pipe_parts = [part for part in pipe_parts if part]
+
+        if len(pipe_parts) >= 2:
+            if not company:
+                company = pipe_parts[0]
+            if not location:
+                location = pipe_parts[1]
+            for extra in pipe_parts[2:]:
+                if not company:
+                    company = extra
+                elif not location:
+                    location = extra
+            continue
+
+        # First leftover short line is normally the location.
         if not location and len(line) <= 60:
             location = line
         elif not company:
@@ -405,11 +424,66 @@ def _bullets_from_rewrite(text, source):
     return unique
 
 
-# A rewrite that keeps fewer than this share of the source bullets is treated
-# as lossy and the source bullets are used instead.
-MIN_BULLET_COVERAGE = 0.6
-
 _LOG = logging.getLogger(__name__)
+
+# A rewritten bullet replaces a source bullet only when the two clearly talk
+# about the same thing (Dice similarity of their word stems).
+MIN_BULLET_MATCH = 0.35
+_STEM_LENGTH = 5
+
+
+def _bullet_stems(text):
+    return {
+        word[:_STEM_LENGTH]
+        for word in re.findall(r"[a-z0-9]{3,}", str(text).lower())
+    }
+
+
+def _similarity(first, second):
+    a, b = _bullet_stems(first), _bullet_stems(second)
+
+    if not a or not b:
+        return 0.0
+
+    return 2 * len(a & b) / (len(a) + len(b))
+
+
+def _align_bullets(source_bullets, candidates):
+    """Pair each source bullet with its best-matching rewritten bullet.
+
+    The result always has exactly one bullet per source bullet: the rewrite
+    when one clearly corresponds to it, otherwise the source bullet itself.
+    Rewritten bullets that match nothing (for example project bullets a
+    model wandered into a job's answer) are ignored.
+
+    Returns (bullets, ignored_rewrites, kept_source_bullets).
+    """
+    pairs = sorted(
+        (
+            (-_similarity(source, candidate), i, j)
+            for i, source in enumerate(source_bullets)
+            for j, candidate in enumerate(candidates)
+        )
+    )
+
+    chosen = {}
+    used = set()
+
+    for negative_score, i, j in pairs:
+        if -negative_score < MIN_BULLET_MATCH:
+            break
+        if i in chosen or j in used:
+            continue
+        chosen[i] = candidates[j]
+        used.add(j)
+
+    bullets = [chosen.get(i, source) for i, source in enumerate(source_bullets)]
+
+    return (
+        bullets,
+        len(candidates) - len(used),
+        len(source_bullets) - len(chosen),
+    )
 
 
 def _group_rewritten_items(source_entries, rewritten_items):
@@ -453,22 +527,18 @@ def _group_rewritten_items(source_entries, rewritten_items):
     return groups
 
 
-def _covers(candidate_bullets, source_bullets):
-    if not source_bullets:
-        return bool(candidate_bullets)
-    needed = math.ceil(MIN_BULLET_COVERAGE * len(source_bullets))
-    return len(candidate_bullets) >= needed
-
-
 def merge_rewritten_entries(source_entries, rewritten_items):
     """Re-attach rewritten bullets to the *source* entry headers.
 
     * Headers (title, company, location, dates) always come from the source.
     * Output has exactly one entry per source entry - a rewrite can never
       duplicate, reorder, or invent entries.
+    * Each source bullet is paired with the rewritten bullet that clearly
+      corresponds to it; unmatched source bullets are kept as written and
+      unrelated rewritten bullets are ignored, so an entry never grows,
+      shrinks, or absorbs another section's content.
     * Falls back to the source bullets when the rewrite is missing, empty,
-      lossy (keeps too few bullets), contains unsupported claims, or
-      contains another entry's title.
+      contains unsupported claims, or contains another entry's title.
     """
     rewritten_items = rewritten_items if isinstance(rewritten_items, list) else []
     groups = _group_rewritten_items(source_entries, rewritten_items)
@@ -495,14 +565,22 @@ def merge_rewritten_entries(source_entries, rewritten_items):
             unsupported = any(_has_unsupported_claims(item) for item in group)
 
             if joined.strip() and not unsupported and not mixed:
-                candidate = _bullets_from_rewrite(joined, source)
-                if candidate and _covers(candidate, source_bullets):
-                    bullets = candidate
-                else:
-                    _LOG.warning(
-                        "Rewrite kept %d of %d bullets for entry %d; using source bullets.",
-                        len(candidate or []), len(source_bullets), index,
+                candidates = _bullets_from_rewrite(joined, source)
+
+                if candidates and source_bullets:
+                    bullets, ignored, kept = _align_bullets(
+                        source_bullets,
+                        candidates,
                     )
+
+                    if ignored or kept:
+                        _LOG.warning(
+                            "Entry %d: ignored %d unrelated rewritten bullet(s); "
+                            "kept %d original bullet(s).",
+                            index, ignored, kept,
+                        )
+                elif candidates:
+                    bullets = candidates
 
         entry["bullets"] = bullets or source_bullets
         merged.append(entry)

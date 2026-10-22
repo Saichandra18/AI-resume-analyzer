@@ -259,3 +259,28 @@ def test_rewrite_summary_retries_with_explicit_section_when_model_returns_empty(
     assert client.calls == 2
     assert result["summary"]["rewritten"]
     assert result["summary"]["original"].startswith("Entry-level")
+
+
+def test_missing_summary_prompt_builds_a_candidate_profile_not_a_project_blurb():
+    class CapturingClient:
+        def __init__(self):
+            self.prompt = ""
+
+        def generate(self, prompt):
+            self.prompt = prompt
+            return "{}"
+
+    client = CapturingClient()
+    rewrite_summary(
+        resume_text=(
+            "Skills\nPython, SQL, RAG\nExperience\n"
+            "LLM Trainer\nReviewed model outputs.\nProjects\n"
+            "Built a resume analyzer using Flask."
+        ),
+        client=client,
+    )
+
+    prompt = client.prompt.lower()
+    assert "create a concise professional profile from the whole resume" in prompt
+    assert "do not describe only one project" in prompt
+    assert "skills, experience, and project work" in prompt

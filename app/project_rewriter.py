@@ -201,6 +201,9 @@ RULES:
 - Return the title on the first line of each rewritten project.
 - Put each project bullet on a separate line.
 - Preserve all factual details from that project's original bullets.
+- If a project has a dedicated "Technologies:" bullet, do not repeat the
+  entire technology list in another bullet. Use the remaining bullet to explain
+  what was built or analyzed, without inventing outcomes.
 
 Return one rewritten item for each original project item.
 
