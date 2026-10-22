@@ -10,6 +10,7 @@ from app.final_resume_validator import validate_final_resume
 from app.resume_content_prioritizer import prioritize_content
 from app.resume_content_selector import rank_content
 from app.resume_length_controller import control_resume_length
+from app.jd_tailoring import order_entry_bullets, order_skills
 from app.resume_rewriter import rewrite_resume
 from app.summary_rewriter import _extract_labeled_summary
 from app.resume_section_orderer import order_sections
@@ -23,6 +24,7 @@ from app.section_parser import (
     get_project_entries,
     merge_rewritten_entries,
     repair_hyphen_breaks,
+    text_similarity,
 )
 
 _LOG = logging.getLogger(__name__)
@@ -232,7 +234,17 @@ def _job_description_terms_in_summary(summary, resume_text, job_description):
     )
 
 
-def _guard_summary_against_job_description(summary, resume_text, job_description):
+# A summary this similar to a single experience/project bullet is that
+# bullet in disguise, not a professional summary.
+SUMMARY_BULLET_COPY_THRESHOLD = 0.45
+
+
+def _guard_summary_against_job_description(
+    summary,
+    resume_text,
+    job_description,
+    bullets=None,
+):
     """Use the candidate's own summary when the rewrite copied the job description.
 
     A summary is rejected when it contains at least three distinctive terms
@@ -254,11 +266,54 @@ def _guard_summary_against_job_description(summary, resume_text, job_description
             _LOG.warning("Summary rewrite was empty; using the resume's own summary.")
         return original
 
+    # The model turned a project/experience bullet into the summary.
+    if bullets and any(
+        text_similarity(summary, bullet) >= SUMMARY_BULLET_COPY_THRESHOLD
+        for bullet in bullets
+    ):
+        original = original_summary()
+        if original:
+            _LOG.warning("Summary was a copy of a bullet; using the resume's own summary.")
+            return original
+
     leaked = _job_description_terms_in_summary(summary, resume_text, job_description)
     total = max(len(_summary_stems(summary)), 1)
 
     if len(leaked) < 3 or len(leaked) / total < 0.15:
         return summary
+
+    # Keep the sentences that are grounded in the resume and drop only the
+    # ones that carry job-description wording the resume never used.
+    sentences = [
+        s.strip() for s in re.split(r"(?<=[.!?])\s+", summary) if s.strip()
+    ]
+    kept = []
+
+    for sentence in sentences:
+        sentence_leaked = _job_description_terms_in_summary(
+            sentence, resume_text, job_description
+        )
+        sentence_total = max(len(_summary_stems(sentence)), 1)
+        if len(sentence_leaked) >= 2 or (
+            sentence_leaked and len(sentence_leaked) / sentence_total >= 0.15
+        ):
+            continue
+        kept.append(sentence)
+
+    candidate = " ".join(kept)
+
+    if (
+        0 < len(kept) < len(sentences)
+        and len(candidate.split()) >= 12
+        and len(
+            _job_description_terms_in_summary(candidate, resume_text, job_description)
+        ) < 3
+    ):
+        _LOG.warning(
+            "Summary: dropped %d sentence(s) with job-description wording; kept the rest.",
+            len(sentences) - len(kept),
+        )
+        return candidate
 
     _LOG.warning("Summary copied job-description wording; using the resume's own summary.")
 
@@ -2241,6 +2296,11 @@ def generate_optimized_resume(
         rewritten_sections.get("summary", ""),
         resume_text,
         job_description,
+        bullets=[
+            bullet
+            for entry in experience_entries + project_entries
+            for bullet in entry.get("bullets", [])
+        ],
     )
 
     # -----------------------------------------------------
@@ -2258,6 +2318,20 @@ def generate_optimized_resume(
                 [],
             )
         ),
+    )
+
+    # Put the bullets that matter for THIS job first. Nothing is added or
+    # reworded; when a page limit forces a trim, the last (least relevant)
+    # bullet is the one that goes.
+    rewritten_sections["experience"] = order_entry_bullets(
+        rewritten_sections.get("experience"),
+        job_description,
+        target_job_title or "",
+    )
+    rewritten_sections["projects"] = order_entry_bullets(
+        rewritten_sections.get("projects"),
+        job_description,
+        target_job_title or "",
     )
 
     # -----------------------------------------------------
@@ -2328,6 +2402,11 @@ def generate_optimized_resume(
     )
     selected_sections["skills"] = _dedupe_skills(
         selected_sections["skills"]
+    )
+    selected_sections["skills"] = order_skills(
+        selected_sections["skills"],
+        job_description,
+        target_job_title or "",
     )
 
     # -----------------------------------------------------
