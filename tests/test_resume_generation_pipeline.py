@@ -1168,3 +1168,19 @@ def test_normalize_projects_preserves_multiple_projects():
             ],
         },
     ]
+def test_normalize_resume_text_repairs_known_missing_spaces():
+    from app.resume_generation_pipeline import _normalize_resume_text
+
+    source = (
+        "Applied definedquality assurance guidelines. "
+        "Followed guidelinesto maintain consistency. "
+        "Performedprompt evaluation. "
+        "Reviewed LLMs)through structured validation."
+    )
+
+    result = _normalize_resume_text(source)
+
+    assert "defined quality" in result
+    assert "guidelines to" in result
+    assert "Performed prompt evaluation" in result
+    assert "LLMs) through" in result

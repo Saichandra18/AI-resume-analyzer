@@ -180,3 +180,21 @@ def test_summary_keeps_grounded_sentences_and_drops_job_description_ones():
     assert result.startswith("AI/ML Engineer with hands-on experience")
     assert "Kubernetes" not in result
     assert "cloud services" not in result
+
+def test_summary_placeholder_falls_back_to_original_summary():
+    placeholder = (
+        "Rewritten summary text that emphasizes relevant skills and "
+        "experience based on the resume data."
+    )
+
+    result = _guard_summary_against_job_description(
+        placeholder,
+        RESUME_TEXT,
+        BI_JOB,
+    )
+
+    assert result == (
+        "AI/ML Engineer with hands-on experience in Machine Learning "
+        "and Generative AI."
+    )
+    assert "Rewritten summary text" not in result
