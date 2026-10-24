@@ -517,7 +517,39 @@ def test_glued_word_repair_still_splits_real_glued_words():
     assert _repair_glued_words("performedprompt outputanalysis", vocabulary) == (
         "performed prompt output analysis"
     )
+def test_glued_word_repair_handles_generated_resume_spacing():
+    vocabulary = {
+        "performed",
+        "prompt",
+        "output",
+        "analysis",
+        "to",
+        "pyspark",
+        "for",
+        "refining",
+    }
 
+    assert _repair_glued_words(
+        "performedprompt outputanalysis analysisto PySparkfor refiningprompt",
+        vocabulary,
+    ) == (
+        "performed prompt output analysis analysis to PySpark for refining prompt"
+    )
+
+
+def test_glued_word_repair_preserves_known_technical_terms():
+    vocabulary = {
+        "tensorflow",
+        "pyspark",
+        "openai",
+        "retrieval-augmented",
+        "generation",
+    }
+
+    assert _repair_glued_words(
+        "TensorFlow PySpark OpenAI",
+        vocabulary,
+    ) == "TensorFlow PySpark OpenAI"
 
 def test_words_broken_across_lines_are_rejoined():
     assert repair_hyphen_breaks("Natural Language Process-\ning, and Big Data") == (
@@ -609,3 +641,9 @@ def test_experience_does_not_absorb_project_bullets():
         "analytics dashboard" in b or "chatbot" in b.lower()
         for b in resume.experience[0]["bullets"]
     )
+def test_normalizer_repairs_remaining_resume_spacing_artifacts():
+    from app.resume_generation_pipeline import _normalize_resume_text
+
+    assert _normalize_resume_text(
+        "refiningprompt engineering techniquesto improve"
+    ) == "refining prompt engineering techniques to improve"

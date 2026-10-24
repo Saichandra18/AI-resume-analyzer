@@ -10,7 +10,12 @@ from app.final_resume_validator import validate_final_resume
 from app.resume_content_prioritizer import prioritize_content
 from app.resume_content_selector import rank_content
 from app.resume_length_controller import control_resume_length
-from app.jd_tailoring import order_entry_bullets, order_skills
+from app.jd_tailoring import (
+    add_supported_competencies,
+    order_entry_bullets,
+    order_skills,
+    order_summary,
+)
 from app.resume_rewriter import rewrite_resume
 from app.summary_rewriter import _extract_labeled_summary
 from app.resume_section_orderer import order_sections
@@ -266,6 +271,23 @@ def _guard_summary_against_job_description(
             _LOG.warning("Summary rewrite was empty; using the resume's own summary.")
         return original
 
+        # Reject explanatory placeholder text returned by the model.
+    lowered_summary = summary.casefold()
+    if (
+        "rewritten summary text" in lowered_summary
+        or (
+            "relevant skills and experience" in lowered_summary
+            and "based on the resume data" in lowered_summary
+        )
+    ):
+        original = original_summary()
+        if original:
+            _LOG.warning(
+                "Summary rewrite was placeholder text; "
+                "using the resume's own summary."
+            )
+            return original
+
     # The model turned a project/experience bullet into the summary.
     if bullets and any(
         text_similarity(summary, bullet) >= SUMMARY_BULLET_COPY_THRESHOLD
@@ -520,7 +542,7 @@ def _normalize_resume_text(text):
         "NaturalLanguageProcessing": "Natural Language Processing",
         "LargeLanguageModels": "Large Language Models",
         "RetrievalAugmentedGeneration":
-            "Retrieval-Augmented Generation",
+        "Retrieval-Augmented Generation",
         "datapreprocessing": "data preprocessing",
         "datatransformation": "data transformation",
         "hands-onexperience": "hands-on experience",
@@ -548,6 +570,10 @@ def _normalize_resume_text(text):
         "Py Spark": "PySpark",
         "Tensor Flow": "TensorFlow",
         "Py Torch": "PyTorch",
+        "ofstatistics": "of statistics",
+        "algorithmswith": "algorithms with",
+        "analysisto": "analysis to",
+        "(RAG)workflows": "(RAG) workflows",
 
     }
 
@@ -612,6 +638,24 @@ def _normalize_resume_text(text):
         flags=re.IGNORECASE,
     )
 
+        # Repair known missing-space artifacts from generated resume text.
+    spacing_repairs = (
+        (r"\bdefinedquality\b", "defined quality"),
+        (r"\bguidelinesto\b", "guidelines to"),
+        (r"\bPerformedprompt\b", "Performed prompt"),
+        (r"\bLLMs\)through\b", "LLMs) through"),
+        (r"\brefiningprompt\b", "refining prompt"),
+        (r"\btechniquesto\b", "techniques to"),
+    )
+
+    for pattern, replacement in spacing_repairs:
+        value = re.sub(
+            pattern,
+            replacement,
+            value,
+            flags=re.IGNORECASE,
+        )
+
     value = re.sub(r"^•\s*", "• ", value)
     value = re.sub(r"[ \t]+", " ", value)
     value = re.sub(r"\n{3,}", "\n\n", value)
@@ -654,17 +698,61 @@ _SPLIT_SUFFIXES = {
 }
 
 
+
+
+
+
 def _repair_glued_words(value, vocabulary):
-    """Repair obvious glued words without changing technical terms."""
+    """Repair obvious glued words while preserving known technical terms."""
     if not isinstance(value, str) or not value:
         return value
 
-    # First repair camel-case boundaries: toRetrieve -> to Retrieve.
-    value = re.sub(
-        r"(?<=[a-z])(?=[A-Z])",
-        " ",
-        value,
-    )
+    vocabulary = {
+        str(word).lower()
+        for word in vocabulary
+        if isinstance(word, str) and word
+    }
+
+    protected_terms = {
+        "tensorflow",
+        "pyspark",
+        "openai",
+        "pytorch",
+        "scikitlearn",
+        "huggingface",
+    }
+
+    # Repair glued suffixes after known technical terms before protecting them.
+    for term in sorted(protected_terms, key=len, reverse=True):
+        pattern = re.compile(
+            rf"({re.escape(term)})([A-Za-z]+)",
+            re.IGNORECASE,
+        )
+
+        def split_technical_prefix(match):
+            suffix = match.group(2).lower()
+            if suffix in vocabulary:
+                return match.group(1) + " " + match.group(2)
+            return match.group(0)
+
+        value = pattern.sub(split_technical_prefix, value)
+
+    # Protect known technical terms before camel-case processing.
+    placeholders = {}
+    for index, term in enumerate(
+        sorted(protected_terms, key=len, reverse=True)
+    ):
+        pattern = re.compile(re.escape(term), re.IGNORECASE)
+
+        def protect(match, index=index):
+            placeholder = f"TECHTERMPLACEHOLDER{index}X"
+            placeholders[placeholder] = match.group(0)
+            return placeholder
+
+        value = pattern.sub(protect, value)
+
+    # Repair camel-case boundaries outside protected technical terms.
+    value = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", value)
 
     def split_token(match):
         token = match.group(0)
@@ -673,32 +761,35 @@ def _repair_glued_words(value, vocabulary):
         if len(lower) < 8 or lower in vocabulary:
             return token
 
-        # Find the best two-word split supported by trusted vocabulary.
-        best = None
-        for cut in range(3, len(lower) - 2):
+        candidates = []
+        for cut in range(3, len(lower) - 1):
             left = lower[:cut]
             right = lower[cut:]
-            # Never split off a bare suffix: "maintaining" is not
-            # "maintain ing".
+
             if left in _SPLIT_SUFFIXES or right in _SPLIT_SUFFIXES:
                 continue
-            if left in vocabulary and right in vocabulary:
-                score = len(left) + len(right)
-                if best is None or score > best[0]:
-                    best = (score, cut)
 
-        if best is None:
+            if left in vocabulary and right in vocabulary:
+                candidates.append((left, right, cut))
+
+        if not candidates:
             return token
 
-        cut = best[1]
+        # Prefer the longest valid left-hand word.
+        _, _, cut = max(candidates, key=lambda item: len(item[0]))
         return token[:cut] + " " + token[cut:]
 
-    return re.sub(
+    value = re.sub(
         r"\b[A-Za-z]{8,}\b",
         split_token,
         value,
     )
 
+    # Restore protected technical terms with their original casing.
+    for placeholder, original in placeholders.items():
+        value = value.replace(placeholder, original)
+
+    return value
 
 def _preserve_supported_keywords_in_final_resume(
     final_resume,
@@ -2303,6 +2394,13 @@ def generate_optimized_resume(
         ],
     )
 
+    # Most job-relevant summary sentences first (wording unchanged).
+    rewritten_sections["summary"] = order_summary(
+        rewritten_sections.get("summary", ""),
+        job_description,
+        target_job_title or "",
+    )
+
     # -----------------------------------------------------
     # Final project normalization
     # -----------------------------------------------------
@@ -2399,6 +2497,14 @@ def generate_optimized_resume(
             job_description,
             ats_result if ats_result else None,
         ),
+    )
+    # Competencies the resume itself states and the job asks for (the skills
+    # extractor only knows a fixed dictionary and drops the rest).
+    selected_sections["skills"] = add_supported_competencies(
+        selected_sections["skills"],
+        resume_text,
+        job_description,
+        target_job_title or "",
     )
     selected_sections["skills"] = _dedupe_skills(
         selected_sections["skills"]

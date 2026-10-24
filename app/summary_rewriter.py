@@ -1,3 +1,4 @@
+
 import json
 
 from app.ai import create_llm_provider
@@ -118,6 +119,17 @@ RULES:
 - Do not exaggerate the candidate's experience.
 - Do not treat the job description as evidence of candidate experience.
 - Never copy sentences, duties, or phrases from the job description into the summary.
+- When a job description is provided, tailor the summary specifically to
+  the target role using only evidence supported by the resume.
+- Prioritize the target role's most relevant supported skills, experience,
+  and project work in the opening sentence.
+- Rewrite the opening sentence when needed; do not preserve the original
+  professional identity or opening wording merely because it appears first.
+- Do not invent professional experience, job titles, or proficiency.
+- If the candidate's experience is primarily project-based, describe it
+  accurately as project experience rather than professional employment.
+- Avoid returning the original summary unchanged when a meaningful,
+  factually supported improvement for the target role is possible.
 
 Return exactly one object:
 
